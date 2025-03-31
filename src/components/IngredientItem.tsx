@@ -28,11 +28,12 @@ const IngredientItem: React.FC<IngredientItemProps> = ({
   return (
     <div className="ingredient-item">
       <div className="flex items-center gap-3">
-        <IngredientCategoryIcon 
-          ingredientName={ingredient.name} 
-          size={20} 
-          className="flex-shrink-0"
-        />
+        <div className="flex-shrink-0">
+          <IngredientCategoryIcon 
+            ingredientName={ingredient.name} 
+            size={20}
+          />
+        </div>
         <div>
           <div className={`font-medium ${!ingredient.enabled ? 'text-muted-foreground line-through' : ''}`}>
             {ingredient.name}

@@ -12,7 +12,9 @@ import {
   Utensils,
   ChefHat,
   Flame,
-  Salad
+  Salad,
+  LucideIcon,
+  LucideProps
 } from 'lucide-react';
 
 type IngredientCategory = 
@@ -91,6 +93,19 @@ interface IngredientCategoryIconProps {
   className?: string;
 }
 
+// Create a map of category to icon component and color
+const categoryIcons: Record<IngredientCategory, { icon: LucideIcon, color: string }> = {
+  fruit: { icon: Apple, color: 'text-red-500' },
+  vegetable: { icon: Salad, color: 'text-green-500' },
+  meat: { icon: Beef, color: 'text-rose-700' },
+  seafood: { icon: Fish, color: 'text-blue-500' },
+  dairy: { icon: Milk, color: 'text-gray-300' },
+  grain: { icon: Wheat, color: 'text-yellow-600' },
+  spice: { icon: Flame, color: 'text-orange-500' },
+  beverage: { icon: Coffee, color: 'text-amber-700' },
+  other: { icon: Utensils, color: 'text-gray-400' }
+};
+
 const IngredientCategoryIcon: React.FC<IngredientCategoryIconProps> = ({ 
   ingredientName, 
   size = 20,
@@ -112,30 +127,17 @@ const IngredientCategoryIcon: React.FC<IngredientCategoryIconProps> = ({
     }
   }
   
-  // Return the appropriate icon based on the category
-  const iconProps = { size, className: `${className}` };
+  // Get the icon component and color from our mapping
+  const { icon: IconComponent, color } = categoryIcons[category];
   
-  switch (category) {
-    case 'fruit':
-      return <Apple {...iconProps} className={`${className} text-red-500`} />;
-    case 'vegetable':
-      return <Salad {...iconProps} className={`${className} text-green-500`} />;
-    case 'meat':
-      return <Beef {...iconProps} className={`${className} text-rose-700`} />;
-    case 'seafood':
-      return <Fish {...iconProps} className={`${className} text-blue-500`} />;
-    case 'dairy':
-      return <Milk {...iconProps} className={`${className} text-gray-300`} />;
-    case 'grain':
-      return <Wheat {...iconProps} className={`${className} text-yellow-600`} />;
-    case 'spice':
-      return <Flame {...iconProps} className={`${className} text-orange-500`} />;
-    case 'beverage':
-      return <Coffee {...iconProps} className={`${className} text-brown-600`} />;
-    case 'other':
-    default:
-      return <Utensils {...iconProps} className={`${className} text-gray-400`} />;
-  }
+  // Return the icon with appropriate styling
+  return (
+    <IconComponent 
+      size={size} 
+      className={`${className} ${color}`} 
+      aria-label={`${category} category`}
+    />
+  );
 };
 
 export default IngredientCategoryIcon;
