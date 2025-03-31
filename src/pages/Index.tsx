@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera, Upload, ArrowRight } from 'lucide-react';
+import { Camera, Upload, ArrowRight, Search, Utensils, ChefHat } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
@@ -46,7 +46,7 @@ const Index = () => {
           </p>
         </div>
         
-        <Card className="max-w-md mx-auto">
+        <Card className="max-w-md mx-auto mb-16">
           <CardContent className="pt-6">
             {!image ? (
               <div className="flex flex-col items-center space-y-4">
@@ -100,6 +100,56 @@ const Index = () => {
             )}
           </CardContent>
         </Card>
+        
+        {/* How It Works Section */}
+        <div className="max-w-4xl mx-auto mt-16 px-4">
+          <h2 className="text-2xl font-semibold text-center mb-10">How It Works</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Step 1 */}
+            <div className="flex flex-col items-center text-center">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                <Camera className="text-primary w-8 h-8" />
+              </div>
+              <h3 className="text-lg font-medium mb-2">Snap a Photo</h3>
+              <p className="text-muted-foreground">
+                Use your camera to take a picture of your leftover ingredients or upload an existing image
+              </p>
+            </div>
+            
+            {/* Step 2 */}
+            <div className="flex flex-col items-center text-center">
+              <div className="w-16 h-16 rounded-full bg-secondary/10 flex items-center justify-center mb-4">
+                <Search className="text-secondary w-8 h-8" />
+              </div>
+              <h3 className="text-lg font-medium mb-2">AI Detection</h3>
+              <p className="text-muted-foreground">
+                Our AI recognizes your ingredients and allows you to adjust quantities and preferences
+              </p>
+            </div>
+            
+            {/* Step 3 */}
+            <div className="flex flex-col items-center text-center">
+              <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center mb-4">
+                <ChefHat className="text-accent w-8 h-8" />
+              </div>
+              <h3 className="text-lg font-medium mb-2">Get Recipes</h3>
+              <p className="text-muted-foreground">
+                Receive personalized recipe suggestions based on your ingredients and dietary preferences
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex justify-center mt-10">
+            <Button 
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              className="gap-2"
+            >
+              <Utensils size={18} />
+              Get Started
+            </Button>
+          </div>
+        </div>
       </main>
       
       <footer className="py-6 border-t border-border">
