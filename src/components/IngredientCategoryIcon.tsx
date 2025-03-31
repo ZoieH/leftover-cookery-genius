@@ -7,12 +7,12 @@ import {
   Milk, 
   Egg, 
   Wheat, 
-  Cheese, 
   Coffee, 
   Banana, 
-  PizzaSlice, 
-  Utensils, 
-  SalmonPoint
+  Utensils,
+  ChefHat,
+  Flame,
+  Salad
 } from 'lucide-react';
 
 type IngredientCategory = 
@@ -119,7 +119,7 @@ const IngredientCategoryIcon: React.FC<IngredientCategoryIconProps> = ({
     case 'fruit':
       return <Apple {...iconProps} className={`${className} text-red-500`} />;
     case 'vegetable':
-      return <Banana {...iconProps} className={`${className} text-green-500`} />;
+      return <Salad {...iconProps} className={`${className} text-green-500`} />;
     case 'meat':
       return <Beef {...iconProps} className={`${className} text-rose-700`} />;
     case 'seafood':
@@ -129,7 +129,7 @@ const IngredientCategoryIcon: React.FC<IngredientCategoryIconProps> = ({
     case 'grain':
       return <Wheat {...iconProps} className={`${className} text-yellow-600`} />;
     case 'spice':
-      return <SalmonPoint {...iconProps} className={`${className} text-orange-500`} />;
+      return <Flame {...iconProps} className={`${className} text-orange-500`} />;
     case 'beverage':
       return <Coffee {...iconProps} className={`${className} text-brown-600`} />;
     case 'other':
