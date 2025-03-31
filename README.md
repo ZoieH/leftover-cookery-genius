@@ -1,8 +1,45 @@
-# Welcome to your Lovable project
+
+# Leftover Cookery Genius
+
+A web application that helps you reduce food waste by generating delicious recipes from your leftover ingredients.
+
+## Features
+
+- **Image Recognition**: Upload images of your leftover ingredients
+- **Ingredient Management**: Edit, add, or remove identified ingredients
+- **Customizable Recipes**: Set dietary preferences and calorie limits
+- **Recipe Generation**: Get personalized recipes based on your available ingredients
+- **Recipe Sharing**: Share, print, or save your favorite recipes
 
 ## Project info
 
 **URL**: https://lovable.dev/projects/91e84543-1d54-4e92-8254-ac7bc18dd47a
+
+## Technology Stack
+
+- Vite
+- TypeScript
+- React
+- shadcn-ui
+- Tailwind CSS
+- React Router
+- Tanstack Query
+
+## How to Use
+
+1. Upload a photo of your leftover ingredients
+2. Verify and adjust the identified ingredients as needed
+3. Set your dietary preferences and calorie goals
+4. Generate a custom recipe
+5. Cook and enjoy your meal!
+
+## Future Enhancements
+
+- Integration with real image recognition API
+- User accounts to save favorite recipes
+- Weekly meal planning based on ingredients
+- Nutritional information for recipes
+- Community features to share custom recipes
 
 ## How can I edit this code?
 
@@ -35,35 +72,3 @@ npm i
 # Step 4: Start the development server with auto-reloading and an instant preview.
 npm run dev
 ```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with .
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/91e84543-1d54-4e92-8254-ac7bc18dd47a) and click on Share -> Publish.
-
-## I want to use a custom domain - is that possible?
-
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
