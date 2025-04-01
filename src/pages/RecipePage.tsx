@@ -3,7 +3,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ArrowLeft, Printer, Share2, ThumbsUp } from 'lucide-react';
+import { ArrowLeft, Printer, Share2, ThumbsUp, Users, Clock, Gauge, Flame } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
 // Mock recipe data
@@ -91,11 +91,11 @@ const RecipePage = () => {
             <div className="w-32"></div> {/* Spacer for alignment */}
           </div>
           
-          <Card className="recipe-container">
-            <div className="recipe-header">
+          <Card className="recipe-container p-6">
+            <div className="recipe-header flex justify-between items-start mb-4">
               <h1 className="text-2xl font-bold">{recipeData.title}</h1>
               
-              <div className="recipe-actions">
+              <div className="recipe-actions flex gap-2">
                 <Button variant="outline" size="icon" onClick={handleShare}>
                   <Share2 size={18} />
                   <span className="sr-only">Share</span>
@@ -114,21 +114,25 @@ const RecipePage = () => {
             </div>
             
             <div className="flex flex-wrap gap-x-6 gap-y-2 mt-2 text-sm text-muted-foreground">
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-2">
+                <Users size={16} className="text-primary" />
                 <span className="font-medium">Servings:</span> {recipeData.servings}
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-2">
+                <Flame size={16} className="text-orange-500" />
                 <span className="font-medium">Calories:</span> {recipeData.calories} kcal/serving
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-2">
+                <Clock size={16} className="text-blue-500" />
                 <span className="font-medium">Time:</span> {recipeData.cookTime}
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-2">
+                <Gauge size={16} className="text-green-500" />
                 <span className="font-medium">Difficulty:</span> {recipeData.difficulty}
               </div>
             </div>
             
-            <div>
+            <div className="my-4">
               <img 
                 src="/placeholder.svg" 
                 alt="Recipe" 
@@ -136,8 +140,8 @@ const RecipePage = () => {
               />
             </div>
             
-            <div className="recipe-section">
-              <h2 className="recipe-section-title">Ingredients:</h2>
+            <div className="recipe-section my-6">
+              <h2 className="recipe-section-title text-xl font-semibold mb-3">Ingredients:</h2>
               <ul className="space-y-1 list-disc list-inside">
                 {recipeData.ingredients.map((ingredient, index) => (
                   <li key={index}>{ingredient}</li>
@@ -145,8 +149,8 @@ const RecipePage = () => {
               </ul>
             </div>
             
-            <div className="recipe-section">
-              <h2 className="recipe-section-title">Instructions:</h2>
+            <div className="recipe-section my-6">
+              <h2 className="recipe-section-title text-xl font-semibold mb-3">Instructions:</h2>
               <ol className="space-y-3 list-decimal list-inside">
                 {recipeData.steps.map((step, index) => (
                   <li key={index} className="pl-1">
@@ -157,8 +161,8 @@ const RecipePage = () => {
             </div>
             
             {recipeData.notes && (
-              <div className="recipe-section">
-                <h2 className="recipe-section-title">Chef's Notes:</h2>
+              <div className="recipe-section my-6">
+                <h2 className="recipe-section-title text-xl font-semibold mb-3">Chef's Notes:</h2>
                 <p className="italic bg-muted p-3 rounded-md">{recipeData.notes}</p>
               </div>
             )}

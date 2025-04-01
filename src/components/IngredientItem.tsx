@@ -26,9 +26,9 @@ const IngredientItem: React.FC<IngredientItemProps> = ({
   onEdit,
 }) => {
   return (
-    <div className="ingredient-item">
+    <div className="ingredient-item p-3 border rounded-lg mb-2 flex items-center justify-between">
       <div className="flex items-center gap-3">
-        <div className="flex-shrink-0">
+        <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
           <IngredientCategoryIcon 
             ingredientName={ingredient.name} 
             size={20}

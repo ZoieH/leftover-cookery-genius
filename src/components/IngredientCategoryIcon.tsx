@@ -44,6 +44,8 @@ const categoryMapping: Record<string, IngredientCategory> = {
   onion: 'vegetable',
   garlic: 'vegetable',
   potato: 'vegetable',
+  corn: 'vegetable',
+  asparagus: 'vegetable',
   
   // Meats
   chicken: 'meat',
@@ -99,11 +101,11 @@ const categoryIcons: Record<IngredientCategory, { icon: LucideIcon, color: strin
   vegetable: { icon: Salad, color: 'text-green-500' },
   meat: { icon: Beef, color: 'text-rose-700' },
   seafood: { icon: Fish, color: 'text-blue-500' },
-  dairy: { icon: Milk, color: 'text-gray-300' },
+  dairy: { icon: Egg, color: 'text-amber-300' },
   grain: { icon: Wheat, color: 'text-yellow-600' },
   spice: { icon: Flame, color: 'text-orange-500' },
   beverage: { icon: Coffee, color: 'text-amber-700' },
-  other: { icon: Utensils, color: 'text-gray-400' }
+  other: { icon: Utensils, color: 'text-gray-500' }
 };
 
 const IngredientCategoryIcon: React.FC<IngredientCategoryIconProps> = ({ 
