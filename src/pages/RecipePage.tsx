@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -254,7 +255,7 @@ const RecipePage = () => {
           </div>
           
           {/* Recipe description */}
-          <Card className="p-6 mb-6">
+          <Card className="p-6 mb-6 recipe-card">
             <p className="text-muted-foreground">{recipeData.description}</p>
           </Card>
           
@@ -280,7 +281,7 @@ const RecipePage = () => {
                   <button className={`px-2 py-1 ${scaleMultiplier === 4 ? 'bg-black text-white' : ''}`} onClick={() => setScale(4)}>4x</button>
                 </div>
                 
-                <div className="space-y-3">
+                <div className="space-y-3 recipe-card p-4 rounded-lg">
                   {ingredients.map((ingredient) => (
                     <div key={ingredient.id} className="flex items-start gap-3">
                       <Checkbox 
@@ -347,9 +348,9 @@ const RecipePage = () => {
                 {!videoMode ? (
                   <div className="space-y-8">
                     {recipeData.steps.map((step, index) => (
-                      <div key={step.id} className="p-6 border rounded-lg">
+                      <div key={step.id} className="p-6 border rounded-lg recipe-card">
                         <div className="flex gap-4 mb-3">
-                          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-800 text-white flex items-center justify-center font-bold">
+                          <div className="flex-shrink-0 w-8 h-8 rounded-full step-number flex items-center justify-center font-bold">
                             {index + 1}
                           </div>
                           <h3 className="text-lg font-semibold">Step {index + 1}</h3>
@@ -390,7 +391,7 @@ const RecipePage = () => {
               {recipeData.notes && (
                 <div className="mb-8">
                   <h2 className="text-xl font-bold mb-4">Chef's Notes</h2>
-                  <Card className="p-6">
+                  <Card className="p-6 recipe-card">
                     <p className="italic">{recipeData.notes}</p>
                   </Card>
                 </div>
