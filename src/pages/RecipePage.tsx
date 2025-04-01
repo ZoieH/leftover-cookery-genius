@@ -1,9 +1,8 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ArrowLeft, Printer, Share2, Info, ShoppingCart, Play, Video, Circle } from 'lucide-react';
+import { ArrowLeft, Printer, Share2, Info, Play, Video, Circle } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
@@ -110,13 +109,6 @@ const RecipePage = () => {
   
   const handlePrint = () => {
     window.print();
-  };
-  
-  const handleShopIngredients = () => {
-    toast({
-      title: "Shop ingredients",
-      description: "This would add all ingredients to your shopping cart.",
-    });
   };
 
   const toggleIngredientCheck = (id: string) => {
@@ -312,15 +304,6 @@ const RecipePage = () => {
                     </div>
                   ))}
                 </div>
-                
-                <Button 
-                  variant="default" 
-                  className="w-full mt-6 bg-red-600 hover:bg-red-700"
-                  onClick={handleShopIngredients}
-                >
-                  <ShoppingCart size={18} className="mr-2" />
-                  SHOP INGREDIENTS
-                </Button>
                 
                 {/* Allergens info */}
                 <div className="mt-6 p-4 bg-muted rounded-lg">
