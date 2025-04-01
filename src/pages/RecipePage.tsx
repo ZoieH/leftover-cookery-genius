@@ -1,44 +1,91 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ArrowLeft, Printer, Share2, ThumbsUp, Users, Clock, Gauge, Flame } from 'lucide-react';
+import { ArrowLeft, Printer, Share2, ThumbsUp, Users, Clock, Gauge, Star, StarHalf } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Separator } from '@/components/ui/separator';
 
 // Mock recipe data
 const recipeData = {
   title: "Beef Stir-Fry with Fresh Vegetables",
+  rating: 4.5,
+  reviews: 26,
+  totalTime: "1 hour",
+  yield: "6-8",
   servings: 4,
   calories: 320,
   cookTime: "25 mins",
   difficulty: "Easy",
+  description: "Rich and savory Beef Stir-Fry with delicious tomato flavor, juicy beef, tender vegetables, lots of herbs and spices. Bright and spicy and comforting!",
   ingredients: [
-    "300g beef, thinly sliced",
-    "2 tomatoes, diced",
-    "100g asparagus, trimmed and cut into pieces",
-    "1 cucumber, sliced",
-    "2 ears of corn, kernels removed",
-    "3 eggs, beaten",
-    "3 cloves garlic, minced",
-    "2 tbsp soy sauce",
-    "1 tbsp oyster sauce",
-    "1 tbsp vegetable oil",
-    "1 tsp sesame oil",
-    "½ tsp sugar",
-    "Salt and pepper to taste"
+    { id: "1", name: "beef", amount: "300g", detail: "thinly sliced", checked: false },
+    { id: "2", name: "tomatoes", amount: "2", detail: "diced", checked: false },
+    { id: "3", name: "asparagus", amount: "100g", detail: "trimmed and cut into pieces", checked: false },
+    { id: "4", name: "cucumber", amount: "1", detail: "sliced", checked: false },
+    { id: "5", name: "corn", amount: "2 ears", detail: "kernels removed", checked: false },
+    { id: "6", name: "eggs", amount: "3", detail: "beaten", checked: false },
+    { id: "7", name: "garlic", amount: "3 cloves", detail: "minced", checked: false },
+    { id: "8", name: "soy sauce", amount: "2 tbsp", detail: "", checked: false },
+    { id: "9", name: "oyster sauce", amount: "1 tbsp", detail: "", checked: false },
+    { id: "10", name: "vegetable oil", amount: "1 tbsp", detail: "", checked: false },
+    { id: "11", name: "sesame oil", amount: "1 tsp", detail: "", checked: false },
+    { id: "12", name: "sugar", amount: "½ tsp", detail: "", checked: false },
+    { id: "13", name: "salt and pepper", amount: "", detail: "to taste", checked: false }
   ],
   steps: [
-    "Heat vegetable oil in a large wok or skillet over high heat.",
-    "Add the beef and stir-fry until browned, about 3-4 minutes. Remove and set aside.",
-    "In the same pan, add garlic and stir-fry for 30 seconds until fragrant.",
-    "Add asparagus and corn kernels, stir-fry for 2 minutes.",
-    "Add tomatoes and cucumber, stir-fry for another minute.",
-    "Push vegetables to one side of the pan and pour beaten eggs into the empty space. Scramble until just set.",
-    "Return beef to the pan and add soy sauce, oyster sauce, sugar, salt, and pepper.",
-    "Toss everything together until well combined and heated through, about 1-2 minutes.",
-    "Drizzle with sesame oil, give a final toss, and remove from heat.",
-    "Serve immediately over rice or noodles."
+    {
+      id: "1",
+      instruction: "Heat vegetable oil in a large wok or skillet over high heat.",
+      image: "/placeholder.svg"
+    },
+    {
+      id: "2",
+      instruction: "Add the beef and stir-fry until browned, about 3-4 minutes. Remove and set aside.",
+      image: "/placeholder.svg"
+    },
+    {
+      id: "3",
+      instruction: "In the same pan, add garlic and stir-fry for 30 seconds until fragrant.",
+      image: "/placeholder.svg"
+    },
+    {
+      id: "4",
+      instruction: "Add asparagus and corn kernels, stir-fry for 2 minutes.",
+      image: ""
+    },
+    {
+      id: "5",
+      instruction: "Add tomatoes and cucumber, stir-fry for another minute.",
+      image: ""
+    },
+    {
+      id: "6",
+      instruction: "Push vegetables to one side of the pan and pour beaten eggs into the empty space. Scramble until just set.",
+      image: "/placeholder.svg"
+    },
+    {
+      id: "7",
+      instruction: "Return beef to the pan and add soy sauce, oyster sauce, sugar, salt, and pepper.",
+      image: ""
+    },
+    {
+      id: "8",
+      instruction: "Toss everything together until well combined and heated through, about 1-2 minutes.",
+      image: ""
+    },
+    {
+      id: "9",
+      instruction: "Drizzle with sesame oil, give a final toss, and remove from heat.",
+      image: ""
+    },
+    {
+      id: "10",
+      instruction: "Serve immediately over rice or noodles.",
+      image: ""
+    }
   ],
   notes: "This recipe is flexible! Feel free to substitute vegetables with whatever you have in your fridge. For a vegetarian version, replace beef with tofu or just add more eggs."
 };
@@ -46,6 +93,8 @@ const recipeData = {
 const RecipePage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [ingredients, setIngredients] = useState(recipeData.ingredients);
+  const [videoMode, setVideoMode] = useState(false);
   
   const handleShare = () => {
     toast({
@@ -63,6 +112,16 @@ const RecipePage = () => {
       title: "Recipe liked!",
       description: "This recipe has been saved to your favorites.",
     });
+  };
+
+  const toggleIngredientCheck = (id: string) => {
+    setIngredients(
+      ingredients.map(ingredient => 
+        ingredient.id === id 
+          ? { ...ingredient, checked: !ingredient.checked } 
+          : ingredient
+      )
+    );
   };
   
   return (
@@ -86,93 +145,155 @@ const RecipePage = () => {
               Back to Ingredients
             </Button>
             
-            <h2 className="text-2xl font-semibold">Recipe Generated</h2>
-            
             <div className="w-32"></div> {/* Spacer for alignment */}
           </div>
           
-          <Card className="recipe-container p-6">
-            <div className="recipe-header flex justify-between items-start mb-4">
-              <h1 className="text-2xl font-bold">{recipeData.title}</h1>
-              
-              <div className="recipe-actions flex gap-2">
-                <Button variant="outline" size="icon" onClick={handleShare}>
-                  <Share2 size={18} />
-                  <span className="sr-only">Share</span>
-                </Button>
-                
-                <Button variant="outline" size="icon" onClick={handlePrint}>
-                  <Printer size={18} />
-                  <span className="sr-only">Print</span>
-                </Button>
-                
-                <Button variant="outline" size="icon" onClick={handleLike}>
-                  <ThumbsUp size={18} />
-                  <span className="sr-only">Like</span>
-                </Button>
-              </div>
-            </div>
-            
-            <div className="flex flex-wrap gap-x-6 gap-y-2 mt-2 text-sm text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <Users size={16} className="text-primary" />
-                <span className="font-medium">Servings:</span> {recipeData.servings}
-              </div>
-              <div className="flex items-center gap-2">
-                <Flame size={16} className="text-orange-500" />
-                <span className="font-medium">Calories:</span> {recipeData.calories} kcal/serving
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock size={16} className="text-blue-500" />
-                <span className="font-medium">Time:</span> {recipeData.cookTime}
-              </div>
-              <div className="flex items-center gap-2">
-                <Gauge size={16} className="text-green-500" />
-                <span className="font-medium">Difficulty:</span> {recipeData.difficulty}
-              </div>
-            </div>
-            
-            <div className="my-4">
+          {/* Hero section with image */}
+          <div className="relative mb-6">
+            <div className="w-32 h-32 mx-auto rounded-full overflow-hidden border-4 border-white shadow-lg">
               <img 
                 src="/placeholder.svg" 
                 alt="Recipe" 
-                className="w-full h-40 md:h-64 object-cover rounded-md mt-4 bg-muted"
+                className="w-full h-full object-cover"
               />
             </div>
-            
-            <div className="recipe-section my-6">
-              <h2 className="recipe-section-title text-xl font-semibold mb-3">Ingredients:</h2>
-              <ul className="space-y-1 list-disc list-inside">
-                {recipeData.ingredients.map((ingredient, index) => (
-                  <li key={index}>{ingredient}</li>
+            <div className="bg-purple-800 text-white text-center py-8 -mt-16 pt-20">
+              <h1 className="text-2xl font-bold mb-2">{recipeData.title}</h1>
+              <Separator className="w-3/4 mx-auto my-3 bg-white/30" />
+              
+              {/* Rating stars */}
+              <div className="flex items-center justify-center gap-1 mb-2">
+                {[...Array(Math.floor(recipeData.rating))].map((_, i) => (
+                  <Star key={`star-${i}`} size={18} className="text-yellow-400 fill-yellow-400" />
                 ))}
-              </ul>
-            </div>
-            
-            <div className="recipe-section my-6">
-              <h2 className="recipe-section-title text-xl font-semibold mb-3">Instructions:</h2>
-              <ol className="space-y-3 list-decimal list-inside">
-                {recipeData.steps.map((step, index) => (
-                  <li key={index} className="pl-1">
-                    <span>{step}</span>
-                  </li>
-                ))}
-              </ol>
-            </div>
-            
-            {recipeData.notes && (
-              <div className="recipe-section my-6">
-                <h2 className="recipe-section-title text-xl font-semibold mb-3">Chef's Notes:</h2>
-                <p className="italic bg-muted p-3 rounded-md">{recipeData.notes}</p>
+                {recipeData.rating % 1 !== 0 && (
+                  <StarHalf size={18} className="text-yellow-400 fill-yellow-400" />
+                )}
+                <span className="text-sm ml-2">{recipeData.rating} from {recipeData.reviews} reviews</span>
               </div>
-            )}
-            
-            <div className="mt-8 flex justify-center">
-              <Button onClick={() => navigate('/')}>
-                Find Another Recipe
-              </Button>
+              
+              {/* Recipe meta */}
+              <div className="flex justify-center items-center gap-6 text-sm mt-3">
+                <div className="flex items-center gap-1">
+                  <Clock size={16} />
+                  <span>TOTAL TIME: {recipeData.totalTime}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Users size={16} />
+                  <span>YIELD: {recipeData.yield}</span>
+                </div>
+              </div>
             </div>
+          </div>
+          
+          {/* Action buttons */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <Button 
+              variant="outline" 
+              className="w-full flex justify-center items-center gap-2" 
+              onClick={handlePrint}
+            >
+              <Printer size={18} />
+              PRINT
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full flex justify-center items-center gap-2" 
+              onClick={handleShare}
+            >
+              <Share2 size={18} />
+              PIN
+            </Button>
+          </div>
+          
+          {/* Recipe description */}
+          <Card className="p-6 mb-6">
+            <p className="text-muted-foreground">{recipeData.description}</p>
           </Card>
+          
+          {/* Ingredients section */}
+          <div className="mb-8">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold uppercase">Ingredients</h2>
+              <div className="flex items-center gap-2 text-sm border rounded-md overflow-hidden">
+                <button className="bg-black text-white px-2 py-1">US</button>
+                <button className="px-2 py-1">M</button>
+                <span className="px-2">SCALE</span>
+                <button className="border-l px-2 py-1">1/2x</button>
+                <button className="border-l border-r px-2 py-1 bg-black text-white">1x</button>
+                <button className="px-2 py-1">2x</button>
+              </div>
+            </div>
+            
+            <div className="space-y-3">
+              {ingredients.map((ingredient) => (
+                <div key={ingredient.id} className="flex items-start gap-3">
+                  <Checkbox 
+                    id={`ingredient-${ingredient.id}`}
+                    checked={ingredient.checked}
+                    onCheckedChange={() => toggleIngredientCheck(ingredient.id)}
+                    className="mt-1"
+                  />
+                  <label 
+                    htmlFor={`ingredient-${ingredient.id}`}
+                    className={`flex-1 cursor-pointer ${ingredient.checked ? 'line-through text-muted-foreground' : ''}`}
+                  >
+                    <span className="font-medium">{ingredient.amount} {ingredient.name}</span>
+                    {ingredient.detail && <span className="text-muted-foreground">, {ingredient.detail}</span>}
+                  </label>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          {/* Instructions section */}
+          <div className="mb-8">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold uppercase">Instructions</h2>
+              <div className="flex items-center gap-2 text-sm border rounded">
+                <button className={`px-3 py-1 ${!videoMode ? 'bg-gray-200' : ''}`} onClick={() => setVideoMode(false)}>TEXT</button>
+                <button className={`px-3 py-1 ${videoMode ? 'bg-gray-200' : ''}`} onClick={() => setVideoMode(true)}>VIDEO</button>
+              </div>
+            </div>
+            
+            <div className="space-y-6">
+              {recipeData.steps.map((step, index) => (
+                <div key={step.id} className="flex gap-4">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-800 text-white flex items-center justify-center font-bold">
+                    {index + 1}
+                  </div>
+                  <div className="flex-1 space-y-3">
+                    <p>{step.instruction}</p>
+                    {step.image && (
+                      <div className="mt-2 rounded-md overflow-hidden border">
+                        <img 
+                          src={step.image} 
+                          alt={`Step ${index + 1}`} 
+                          className="w-full h-48 object-cover"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          {/* Chef's notes */}
+          {recipeData.notes && (
+            <div className="mb-8">
+              <h2 className="text-xl font-bold mb-4 uppercase">Chef's Notes</h2>
+              <Card className="p-6">
+                <p className="italic">{recipeData.notes}</p>
+              </Card>
+            </div>
+          )}
+          
+          <div className="mt-8 flex justify-center">
+            <Button onClick={() => navigate('/')}>
+              Find Another Recipe
+            </Button>
+          </div>
         </div>
       </main>
       
