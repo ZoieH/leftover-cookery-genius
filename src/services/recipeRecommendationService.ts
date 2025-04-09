@@ -40,7 +40,7 @@ export const recommendRecipesFromIngredients = async (
     threshold = 0.2,
     maxResults = 10,
     useLocalRecipes = true,
-    useSpoonacular = true
+    useSpoonacular = false // Changed default to false due to API limits
   } = options;
 
   try {
@@ -56,14 +56,29 @@ export const recommendRecipesFromIngredients = async (
       allRecipes.push(...localRecipes);
     }
 
-    // Get Spoonacular recipes if enabled
+    // Try Spoonacular recipes if enabled, but handle failures gracefully
     if (useSpoonacular) {
-      const spoonacularRecipes = await searchSpoonacularRecipes(ingredients, dietaryFilter);
-      allRecipes.push(...spoonacularRecipes);
+      try {
+        const spoonacularRecipes = await searchSpoonacularRecipes(ingredients, dietaryFilter);
+        allRecipes.push(...spoonacularRecipes);
+      } catch (error) {
+        console.warn('Spoonacular API error, falling back to local recipes:', error);
+        // Don't throw error, just continue with local recipes
+      }
+    }
+
+    // If no recipes found at all, try local recipes as fallback even if not enabled
+    if (allRecipes.length === 0 && !useLocalRecipes) {
+      const fallbackRecipes = await searchRecipes({
+        ingredients,
+        dietaryPreference: dietaryFilter,
+        maxResults: maxResults
+      });
+      allRecipes.push(...fallbackRecipes);
     }
 
     // Filter and sort all recipes
-    return allRecipes
+    const filteredRecipes = allRecipes
       .filter(recipe => {
         const coverage = calculateIngredientCoverage(recipe, ingredients);
         const hasAtLeastOneMatch = countMatchingIngredients(recipe, ingredients) > 0;
@@ -75,6 +90,16 @@ export const recommendRecipesFromIngredients = async (
         return coverageB - coverageA;
       })
       .slice(0, maxResults);
+
+    // If still no recipes found after filtering, lower the threshold and try again
+    if (filteredRecipes.length === 0 && threshold > 0.1) {
+      return recommendRecipesFromIngredients(ingredients, dietaryFilter, {
+        ...options,
+        threshold: threshold / 2
+      });
+    }
+
+    return filteredRecipes;
 
   } catch (error) {
     console.error('Error recommending recipes:', error);

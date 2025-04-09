@@ -1,13 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, FC } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Loader2, Search, Plus, Clock, User } from 'lucide-react';
-import { useToast } from './ui/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import { recommendRecipesFromIngredients } from '../services/recipeRecommendationService';
 import { calculateIngredientCoverage, findMissingIngredients } from '../utils/recipeUtils';
 import type { Recipe } from '@/types/recipe';
 import { cn } from '@/lib/utils';
+import { SpoonacularError } from '../services/spoonacularService';
+import { toast } from '@/components/ui/use-toast';
 
 interface IngredientBasedRecommendationsProps {
   ingredients: string[];
@@ -33,7 +35,7 @@ const clearRecipeCache = () => {
   keys.forEach(key => sessionStorage.removeItem(key));
 };
 
-const IngredientBasedRecommendations: React.FC<IngredientBasedRecommendationsProps> = ({
+const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = ({
   ingredients,
   dietaryFilter,
   onSelectRecipe
@@ -73,12 +75,26 @@ const IngredientBasedRecommendations: React.FC<IngredientBasedRecommendationsPro
         allRecipes = JSON.parse(cachedResults);
         console.log('Using cached recipe recommendations');
       } else {
-        // Get fresh results from API
-        allRecipes = await recommendRecipesFromIngredients(ingredients, dietaryFilter, { threshold: 0.1 });
-        // Cache the results
-        if (useCache) {
-          sessionStorage.setItem(cacheKey, JSON.stringify(allRecipes));
-          console.log('Caching new recipe recommendations');
+        try {
+          // Get fresh results from API
+          allRecipes = await recommendRecipesFromIngredients(ingredients, dietaryFilter, { threshold: 0.1 });
+          // Cache the results
+          if (useCache) {
+            sessionStorage.setItem(cacheKey, JSON.stringify(allRecipes));
+            console.log('Caching new recipe recommendations');
+          }
+        } catch (error) {
+          if (error instanceof SpoonacularError) {
+            toast({
+              description: 'API limit reached. Please try again later.',
+              variant: 'destructive',
+            });
+          } else {
+            toast({
+              description: 'Failed to get recipe recommendations.',
+              variant: 'destructive',
+            });
+          }
         }
       }
       
@@ -104,8 +120,10 @@ const IngredientBasedRecommendations: React.FC<IngredientBasedRecommendationsPro
       if (exactMatches.length === 0 && showToast) {
         toast({
           title: "No Exact Matches Found",
-          description: "We couldn't find recipes matching all your ingredients, but here are some alternatives you might like.",
-          variant: "destructive",
+          description: alternatives.length > 0 
+            ? "We couldn't find recipes matching all your ingredients, but here are some alternatives you might like."
+            : "We couldn't find any recipes matching your ingredients. Try adding more ingredients or adjusting your filters.",
+          variant: alternatives.length > 0 ? "default" : "destructive",
         });
       }
     } catch (error) {
@@ -113,12 +131,28 @@ const IngredientBasedRecommendations: React.FC<IngredientBasedRecommendationsPro
       if (showToast) {
         toast({
           title: "Recommendation Error",
-          description: "Failed to fetch recipe recommendations. Please try again.",
+          description: "Failed to fetch recipe recommendations. Please try again later.",
           variant: "destructive",
         });
       }
+      setRecommendations([]);
+      setAlternativeRecipes([]);
     } finally {
       setIsLoading(false);
+    }
+
+    if (recommendations.length === 0) {
+      if (ingredients.length === 0) {
+        toast({
+          description: 'Please add some ingredients first.',
+          variant: 'default',
+        });
+      } else {
+        toast({
+          description: 'No recipes found with your ingredients.',
+          variant: 'default',
+        });
+      }
     }
   };
 

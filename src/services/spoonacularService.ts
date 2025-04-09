@@ -32,6 +32,13 @@ interface SpoonacularRecipeDetail {
   }>;
 }
 
+export class SpoonacularError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+    this.name = 'SpoonacularError';
+  }
+}
+
 class RateLimiter {
   private queue: Array<() => Promise<any>> = [];
   private processing = false;
@@ -87,6 +94,14 @@ export async function searchSpoonacularRecipes(
   ingredients: string[],
   dietaryPreference?: string
 ): Promise<Recipe[]> {
+  if (!API_KEY) {
+    throw new SpoonacularError(400, 'Spoonacular API key not configured');
+  }
+
+  if (!ingredients.length) {
+    return [];
+  }
+
   try {
     const params = new URLSearchParams({
       apiKey: API_KEY,
@@ -105,7 +120,10 @@ export async function searchSpoonacularRecipes(
     );
 
     if (!searchResponse.ok) {
-      throw new Error(`Spoonacular API error: ${searchResponse.statusText}`);
+      if (searchResponse.status === 402) {
+        throw new SpoonacularError(402, 'API quota exceeded');
+      }
+      throw new SpoonacularError(searchResponse.status, `API error: ${searchResponse.statusText}`);
     }
 
     const searchResults: SpoonacularSearchResult[] = await searchResponse.json();
@@ -117,12 +135,18 @@ export async function searchSpoonacularRecipes(
 
     return detailedRecipes.filter((recipe): recipe is SpoonacularRecipe => recipe !== null);
   } catch (error) {
-    console.error('Error searching Spoonacular recipes:', error);
-    return [];
+    if (error instanceof SpoonacularError) {
+      throw error;
+    }
+    throw new SpoonacularError(500, `Failed to search recipes: ${error.message}`);
   }
 }
 
 export async function getSpoonacularRecipeById(id: string | number): Promise<SpoonacularRecipe | null> {
+  if (!API_KEY) {
+    throw new SpoonacularError(400, 'Spoonacular API key not configured');
+  }
+
   try {
     const params = new URLSearchParams({
       apiKey: API_KEY
@@ -133,7 +157,10 @@ export async function getSpoonacularRecipeById(id: string | number): Promise<Spo
     );
 
     if (!response.ok) {
-      throw new Error(`Spoonacular API error: ${response.statusText}`);
+      if (response.status === 402) {
+        throw new SpoonacularError(402, 'API quota exceeded');
+      }
+      throw new SpoonacularError(response.status, `API error: ${response.statusText}`);
     }
 
     const data: SpoonacularRecipeDetail = await response.json();
@@ -155,7 +182,9 @@ export async function getSpoonacularRecipeById(id: string | number): Promise<Spo
       source: RecipeSource.SPOONACULAR
     };
   } catch (error) {
-    console.error('Error getting Spoonacular recipe details:', error);
-    return null;
+    if (error instanceof SpoonacularError) {
+      throw error;
+    }
+    throw new SpoonacularError(500, `Failed to get Spoonacular recipe details: ${error.message}`);
   }
 } 
