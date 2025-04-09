@@ -1,4 +1,3 @@
-
 import React, { useRef, useState } from 'react';
 import { Upload, Camera } from 'lucide-react';
 
@@ -9,13 +8,42 @@ type ImageUploaderProps = {
 const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageCapture }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // In a real app, this would process actual files
-  // For this demo, we'll just use a placeholder image
-  const handleImageSelect = () => {
-    // Use a placeholder image for the demo
-    const placeholderImage = '/lovable-uploads/d600b92f-527e-4ada-85b7-50ad5678eca4.png';
-    onImageCapture(placeholderImage);
+  // Convert file to base64 data URL
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  // Handle actual file selection
+  const handleImageSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    setIsLoading(true);
+    try {
+      const files = event.target.files;
+      if (files && files.length > 0) {
+        const file = files[0];
+        // Check that it's an image
+        if (!file.type.startsWith('image/')) {
+          alert('Please select an image file.');
+          setIsLoading(false);
+          return;
+        }
+
+        // Convert to base64
+        const base64 = await fileToBase64(file);
+        onImageCapture(base64);
+      }
+    } catch (error) {
+      console.error('Error processing image:', error);
+      alert('Error processing image. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -27,10 +55,32 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageCapture }) => {
     setDragging(false);
   };
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setDragging(false);
-    handleImageSelect();
+    setIsLoading(true);
+    
+    try {
+      const files = e.dataTransfer.files;
+      if (files && files.length > 0) {
+        const file = files[0];
+        // Check that it's an image
+        if (!file.type.startsWith('image/')) {
+          alert('Please drop an image file.');
+          setIsLoading(false);
+          return;
+        }
+
+        // Convert to base64
+        const base64 = await fileToBase64(file);
+        onImageCapture(base64);
+      }
+    } catch (error) {
+      console.error('Error processing dropped image:', error);
+      alert('Error processing image. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const triggerFileInput = () => {
@@ -41,7 +91,9 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageCapture }) => {
 
   return (
     <div
-      className={`w-full h-full cursor-pointer ${dragging ? 'bg-primary/10' : ''}`}
+      className={`w-full min-h-[200px] cursor-pointer transition-colors duration-200 ${
+        dragging ? 'bg-primary/20 border-2 border-dashed border-primary' : 'bg-muted/50 border-2 border-dashed border-muted-foreground/30'
+      } ${isLoading ? 'opacity-50' : ''} rounded-lg p-12`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -54,12 +106,16 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageCapture }) => {
         accept="image/*"
         onChange={handleImageSelect}
       />
-      <div className="flex flex-col items-center justify-center">
-        <div className="p-3 bg-primary/10 rounded-full mb-2">
-          <Upload size={24} className="text-primary" />
+      <div className="flex flex-col items-center justify-center h-full">
+        <div className="p-6 bg-primary/10 rounded-full mb-6">
+          <Upload size={40} className="text-primary" />
         </div>
-        <p className="font-medium">Upload an image</p>
-        <p className="text-xs text-muted-foreground mt-1">or drag and drop</p>
+        <p className="font-medium text-xl mb-2">
+          {isLoading ? 'Processing...' : 'Upload an image'}
+        </p>
+        <p className="text-base text-muted-foreground">
+          {dragging ? 'Drop your image here' : 'or drag and drop'}
+        </p>
       </div>
     </div>
   );

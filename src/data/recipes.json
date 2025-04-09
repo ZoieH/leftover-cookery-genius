@@ -1,0 +1,229 @@
+[
+  {
+    "id": "1",
+    "title": "Vegetable Frittata",
+    "description": "A delicious and easy frittata using leftover vegetables",
+    "image": "/recipes/frittata.jpg",
+    "ingredients": [
+      "6 large eggs",
+      "1/4 cup milk",
+      "1 cup mixed leftover vegetables, chopped",
+      "1/2 cup shredded cheese",
+      "Salt and pepper to taste"
+    ],
+    "instructions": [
+      "Preheat oven to 375°F (190°C)",
+      "Whisk eggs and milk together in a bowl",
+      "Add chopped vegetables and cheese",
+      "Season with salt and pepper",
+      "Pour into an oven-safe skillet",
+      "Bake for 20-25 minutes until set"
+    ],
+    "prepTime": "10min",
+    "cookTime": "25min",
+    "servings": 4,
+    "dietaryTags": ["vegetarian", "gluten-free"],
+    "source": "LOCAL"
+  },
+  {
+    "id": "2",
+    "title": "Leftover Rice Stir-Fry",
+    "description": "Quick and easy stir-fry using leftover rice and vegetables",
+    "image": "/recipes/stir-fry.jpg",
+    "ingredients": [
+      "2 cups leftover cooked rice",
+      "1 cup mixed vegetables",
+      "2 eggs",
+      "2 tablespoons soy sauce",
+      "1 tablespoon oil"
+    ],
+    "instructions": [
+      "Heat oil in a large pan or wok",
+      "Add vegetables and stir-fry until tender",
+      "Push vegetables to one side and scramble eggs",
+      "Add rice and soy sauce",
+      "Stir-fry everything together until heated through"
+    ],
+    "prepTime": "5min",
+    "cookTime": "15min",
+    "servings": 2,
+    "dietaryTags": ["dairy-free"],
+    "source": "LOCAL"
+  },
+  {
+    "id": "3",
+    "title": "Leftover Chicken Fried Rice",
+    "description": "Transform leftover chicken and rice into a delicious quick meal.",
+    "ingredients": ["chicken", "rice", "egg", "carrot", "peas", "onion", "garlic", "soy sauce", "sesame oil"],
+    "image": "/recipes/chicken-fried-rice.jpg",
+    "prepTime": "15 minutes",
+    "cookTime": "10 minutes",
+    "servings": 4,
+    "calories": 380,
+    "dietaryTags": ["dairy-free"],
+    "instructions": [
+      "Dice leftover chicken into small pieces.",
+      "Heat oil in a large wok or skillet over high heat.",
+      "Add onions and garlic, stir fry for 1 minute until fragrant.",
+      "Add carrots and stir fry for 2 minutes.",
+      "Push everything to one side of the pan, crack eggs on the empty side.",
+      "Scramble the eggs until just set, then mix with the vegetables.",
+      "Add cold leftover rice, breaking up any clumps.",
+      "Add chicken and peas, stir to combine.",
+      "Add soy sauce and sesame oil, toss until everything is heated through.",
+      "Serve hot, garnished with green onions if desired."
+    ]
+  },
+  {
+    "id": "4",
+    "title": "Cucumber Tomato Salad",
+    "description": "A refreshing and simple salad that's perfect for summer.",
+    "ingredients": ["cucumber", "tomato", "red onion", "olive oil", "vinegar", "salt", "pepper", "herbs"],
+    "image": "/recipes/cucumber-tomato-salad.jpg",
+    "prepTime": "10 minutes",
+    "cookTime": "0 minutes",
+    "servings": 4,
+    "calories": 120,
+    "dietaryTags": ["vegan", "gluten-free", "low-calorie", "raw"],
+    "instructions": [
+      "Slice cucumbers and tomatoes into bite-sized pieces.",
+      "Thinly slice red onion.",
+      "Combine all vegetables in a large bowl.",
+      "Whisk together olive oil, vinegar, salt, pepper, and herbs.",
+      "Pour dressing over the vegetables and toss to coat.",
+      "Chill for at least 10 minutes before serving for best flavor."
+    ]
+  },
+  {
+    "id": "5",
+    "title": "Simple Beef Tacos",
+    "description": "Easy weeknight tacos using leftover ground beef.",
+    "ingredients": ["beef", "taco seasoning", "tomato", "lettuce", "cheese", "sour cream", "taco shells"],
+    "image": "/recipes/beef-tacos.jpg",
+    "prepTime": "5 minutes",
+    "cookTime": "10 minutes",
+    "servings": 4,
+    "calories": 410,
+    "dietaryTags": ["high-protein"],
+    "instructions": [
+      "Heat leftover ground beef in a skillet.",
+      "Add taco seasoning and a splash of water, simmer for 2-3 minutes.",
+      "Dice tomatoes and shred lettuce.",
+      "Warm taco shells according to package instructions.",
+      "Assemble tacos with beef, vegetables, cheese, and sour cream."
+    ]
+  },
+  {
+    "id": "6",
+    "title": "Vegetarian Corn and Bean Quesadillas",
+    "description": "Quick and satisfying quesadillas packed with protein.",
+    "ingredients": ["corn", "black beans", "cheese", "tortilla", "bell pepper", "onion", "cilantro", "lime"],
+    "image": "/recipes/bean-quesadillas.jpg",
+    "prepTime": "10 minutes",
+    "cookTime": "10 minutes",
+    "servings": 2,
+    "calories": 360,
+    "dietaryTags": ["vegetarian", "high-protein"],
+    "instructions": [
+      "Drain and rinse black beans, drain corn.",
+      "Dice bell pepper and onion.",
+      "Mix beans, corn, pepper, onion, and cilantro in a bowl. Add lime juice and seasoning.",
+      "Heat a large skillet over medium heat.",
+      "Place a tortilla in the skillet, sprinkle half with cheese.",
+      "Add a portion of the bean mixture on top of the cheese.",
+      "Add more cheese on top, then fold the tortilla in half.",
+      "Cook until golden and crispy, about 2-3 minutes per side.",
+      "Repeat with remaining ingredients. Cut into wedges and serve hot."
+    ]
+  },
+  {
+    "id": "7",
+    "title": "Egg Fried Rice",
+    "description": "A simple and quick Asian-inspired dish using leftover rice.",
+    "ingredients": ["rice", "egg", "green onion", "soy sauce", "sesame oil", "garlic", "peas", "carrot"],
+    "image": "/recipes/egg-fried-rice.jpg",
+    "prepTime": "5 minutes",
+    "cookTime": "10 minutes",
+    "servings": 2,
+    "calories": 320,
+    "dietaryTags": ["vegetarian"],
+    "instructions": [
+      "Heat oil in a wok or large skillet over high heat.",
+      "Crack eggs into the pan and scramble until just set.",
+      "Add garlic and stir fry for 30 seconds until fragrant.",
+      "Add cold leftover rice, breaking up any clumps.",
+      "Add peas and carrots, stir to combine.",
+      "Add soy sauce and sesame oil, toss until everything is heated through.",
+      "Stir in chopped green onions.",
+      "Serve hot."
+    ]
+  },
+  {
+    "id": "8",
+    "title": "Asparagus and Tomato Pasta",
+    "description": "A light and fresh pasta dish that's ready in minutes.",
+    "ingredients": ["asparagus", "tomato", "pasta", "garlic", "olive oil", "parmesan", "lemon"],
+    "image": "/recipes/asparagus-pasta.jpg",
+    "prepTime": "5 minutes",
+    "cookTime": "15 minutes",
+    "servings": 2,
+    "calories": 380,
+    "dietaryTags": ["vegetarian"],
+    "instructions": [
+      "Cook pasta according to package instructions.",
+      "Meanwhile, trim asparagus and cut into 2-inch pieces.",
+      "Heat olive oil in a large skillet over medium heat.",
+      "Add garlic and cook until fragrant, about 30 seconds.",
+      "Add asparagus and cook for 3-4 minutes until bright green and tender-crisp.",
+      "Add halved cherry tomatoes and cook for another minute.",
+      "Drain pasta, reserving 1/4 cup of pasta water.",
+      "Add pasta to the skillet with vegetables, along with reserved pasta water.",
+      "Add lemon zest, lemon juice, and grated parmesan. Toss to combine.",
+      "Season with salt and pepper to taste. Serve hot."
+    ]
+  },
+  {
+    "id": "9",
+    "title": "Corn and Cucumber Salsa",
+    "description": "A fresh and crisp salsa perfect for chips or as a side dish.",
+    "ingredients": ["corn", "cucumber", "tomato", "red onion", "jalapeño", "lime", "cilantro", "salt"],
+    "image": "/recipes/corn-salsa.jpg",
+    "prepTime": "15 minutes",
+    "cookTime": "0 minutes",
+    "servings": 4,
+    "calories": 110,
+    "dietaryTags": ["vegan", "gluten-free", "low-calorie", "raw"],
+    "instructions": [
+      "If using fresh corn, cut kernels from the cob. If using canned, drain well.",
+      "Dice cucumber, tomato, and red onion into small pieces.",
+      "Finely chop jalapeño (remove seeds for less heat).",
+      "Chop cilantro leaves.",
+      "Combine all ingredients in a bowl.",
+      "Squeeze lime juice over the mixture, add salt to taste.",
+      "Stir to combine and let sit for at least 10 minutes before serving to allow flavors to meld."
+    ]
+  },
+  {
+    "id": "10",
+    "title": "Simple Egg Breakfast Bowl",
+    "description": "A protein-packed breakfast bowl that's customizable with leftover vegetables.",
+    "ingredients": ["egg", "potato", "bell pepper", "onion", "cheese", "salt", "pepper", "herbs"],
+    "image": "/recipes/egg-bowl.jpg",
+    "prepTime": "5 minutes",
+    "cookTime": "15 minutes",
+    "servings": 1,
+    "calories": 350,
+    "dietaryTags": ["vegetarian", "gluten-free", "high-protein"],
+    "instructions": [
+      "Dice potato into small cubes, microwave for 2-3 minutes to partially cook.",
+      "Heat oil in a skillet over medium heat.",
+      "Add potato cubes and cook until golden and crispy, about 5-7 minutes.",
+      "Add diced bell pepper and onion, cook for another 3-4 minutes until softened.",
+      "Create a well in the center, crack eggs into it.",
+      "Cook eggs to desired doneness (scramble or leave whole).",
+      "Sprinkle with cheese, salt, pepper, and herbs.",
+      "Cover for 1 minute to melt cheese.",
+      "Serve hot in a bowl, optionally with hot sauce or salsa."
+    ]
+  }
+] 
