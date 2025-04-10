@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, getDocs, addDoc, query, where } from 'firebase/firestore';
-import type { LocalRecipe, RecipeSearchParams } from '@/types/recipe';
+import type { LocalRecipe, RecipeSearchParams, Recipe } from '@/types/recipe';
+import { RecipeSource } from '@/types/recipe';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -48,11 +49,17 @@ export async function getAllRecipes(): Promise<LocalRecipe[]> {
 }
 
 /**
- * Add a new recipe to Firestore
+ * Add a recipe to Firestore
  */
-export async function addRecipe(recipe: Omit<LocalRecipe, 'id'>): Promise<string> {
+export async function addRecipe(recipe: Omit<Recipe, 'id'>): Promise<string> {
   try {
-    const docRef = await addDoc(recipesCollection, recipe);
+    // Convert to LocalRecipe format
+    const localRecipe: Omit<LocalRecipe, 'id'> = {
+      ...recipe,
+      source: RecipeSource.LOCAL
+    };
+
+    const docRef = await addDoc(recipesCollection, localRecipe);
     return docRef.id;
   } catch (error) {
     console.error('Error adding recipe:', error);
@@ -96,7 +103,13 @@ export async function searchRecipes(params: RecipeSearchParams): Promise<LocalRe
         'vegetarian': ['vegetarian'],
         'vegan': ['vegan'],
         'gluten-free': ['gluten-free'],
-        'low-carb': ['low-carb', 'keto']
+        'lactose-free': ['lactose-free', 'dairy-free'],
+        'high-protein': ['high-protein', 'protein-rich'],
+        'low-carb': ['low-carb'],
+        'kosher': ['kosher'],
+        'halal': ['halal'],
+        'atlantic': ['atlantic'],
+        'keto': ['keto', 'ketogenic']
       };
       
       const validTags = tagMap[params.dietaryPreference] || [];

@@ -50,7 +50,18 @@ const getInitialIngredients = (): Ingredient[] => {
   ];
 };
 
-type DietaryPreference = 'none' | 'vegetarian' | 'vegan' | 'gluten-free' | 'low-carb';
+type DietaryPreference = 
+  | 'none' 
+  | 'vegetarian' 
+  | 'vegan' 
+  | 'gluten-free' 
+  | 'lactose-free'
+  | 'high-protein'
+  | 'low-carb'
+  | 'kosher'
+  | 'halal'
+  | 'atlantic'
+  | 'keto';
 
 const IngredientsPage = () => {
   // Change the starting step to 1 and update step handling
@@ -439,8 +450,14 @@ const IngredientsPage = () => {
                         <SelectItem value="none">No restrictions</SelectItem>
                         <SelectItem value="vegetarian">Vegetarian</SelectItem>
                         <SelectItem value="vegan">Vegan</SelectItem>
-                        <SelectItem value="gluten-free">Gluten-free</SelectItem>
-                        <SelectItem value="low-carb">Low carb</SelectItem>
+                        <SelectItem value="gluten-free">Gluten-Free</SelectItem>
+                        <SelectItem value="lactose-free">Lactose-Free</SelectItem>
+                        <SelectItem value="high-protein">High-Protein</SelectItem>
+                        <SelectItem value="low-carb">Low-Carb</SelectItem>
+                        <SelectItem value="kosher">Kosher</SelectItem>
+                        <SelectItem value="halal">Halal</SelectItem>
+                        <SelectItem value="atlantic">Atlantic</SelectItem>
+                        <SelectItem value="keto">Keto</SelectItem>
                       </SelectContent>
                     </Select>
                   </CardContent>

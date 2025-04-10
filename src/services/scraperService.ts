@@ -820,10 +820,14 @@ function parseGenericRecipe(html: string, url: string): Omit<Recipe, 'id'> | nul
     // First try to extract using our structured data extractor
     const structuredRecipe = extractRecipeFromAnyStructure(html);
     if (structuredRecipe) {
-      // Add the source URL to the recipe notes
       return {
         ...structuredRecipe,
-        description: `${structuredRecipe.description}\n\nSource: ${url}`
+        title: structuredRecipe.title || 'Untitled Recipe',
+        description: `${structuredRecipe.description}\n\nSource: ${url}`,
+        ingredients: structuredRecipe.ingredients || [],
+        instructions: structuredRecipe.instructions || [],
+        dietaryTags: structuredRecipe.dietaryTags || [],
+        source: RecipeSource.SPOONACULAR
       };
     }
     
