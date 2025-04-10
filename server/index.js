@@ -14,12 +14,45 @@ dotenv.config({ path: path.join(__dirname, '../.env') });
 const app = express();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-// Middleware
-app.use(express.json());
+// Middleware for CORS
 app.use(cors({
   origin: ['http://localhost:3000', 'http://localhost:3002', 'http://localhost:5173', process.env.FRONTEND_URL],
   credentials: true
 }));
+
+// Special handling for Stripe webhooks
+app.use((req, res, next) => {
+  if (req.originalUrl === '/api/webhook') {
+    express.raw({ type: 'application/json' })(req, res, next);
+  } else {
+    express.json()(req, res, next);
+  }
+});
+
+// For Stripe webhook - must come before express.json() middleware
+app.post('/api/webhook', async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+
+  try {
+    const event = stripe.webhooks.constructEvent(
+      req.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object;
+      // Handle successful payment
+      console.log('Payment successful for user:', session.client_reference_id);
+      // Here you would update the user's premium status in your database
+    }
+
+    res.json({ received: true });
+  } catch (error) {
+    console.error('Webhook error:', error);
+    res.status(400).send(`Webhook Error: ${error.message}`);
+  }
+});
 
 // Create checkout session endpoint
 app.post('/api/create-checkout-session', async (req, res) => {
@@ -48,8 +81,8 @@ app.post('/api/create-checkout-session', async (req, res) => {
         },
       ],
       mode: 'subscription',
-      success_url: `${process.env.FRONTEND_URL}/upgrade?success=true&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.FRONTEND_URL}/upgrade?canceled=true`,
+      success_url: `${process.env.FRONTEND_URL}/payment-success?user=${userId}&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.FRONTEND_URL}/payment-canceled`,
       customer_email: email,
       client_reference_id: userId,
     });
@@ -59,31 +92,6 @@ app.post('/api/create-checkout-session', async (req, res) => {
   } catch (error) {
     console.error('Error creating checkout session:', error);
     res.status(500).json({ error: 'Failed to create checkout session' });
-  }
-});
-
-// Webhook endpoint
-app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-  const sig = req.headers['stripe-signature'];
-
-  try {
-    const event = stripe.webhooks.constructEvent(
-      req.body,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
-
-    if (event.type === 'checkout.session.completed') {
-      const session = event.data.object;
-      // Handle successful payment
-      console.log('Payment successful for user:', session.client_reference_id);
-      // Here you would update the user's premium status in your database
-    }
-
-    res.json({ received: true });
-  } catch (error) {
-    console.error('Webhook error:', error);
-    res.status(400).send(`Webhook Error: ${error.message}`);
   }
 });
 
