@@ -246,7 +246,7 @@ const IngredientsPage = () => {
 
   return (
     <Layout>
-      <div className="container max-w-4xl mx-auto p-4 space-y-8">
+      <div className="container max-w-4xl mx-auto p-4 space-y-8 pb-24 md:pb-4">
         <div className="flex items-center justify-between">
           <Button
             variant="ghost"
@@ -478,26 +478,6 @@ const IngredientsPage = () => {
                   </CardContent>
                 </Card>
               </div>
-              
-              <div className="mt-8 flex justify-end">
-                <Button 
-                  onClick={handleGenerateRecipe}
-                  className="gap-2"
-                  disabled={isGeneratingRecipe}
-                >
-                  {isGeneratingRecipe ? (
-                    <>
-                      <Loader2 size={16} className="mr-2 animate-spin" />
-                      Finding Recipes...
-                    </>
-                  ) : (
-                    <>
-                      Find Recipes
-                      <ArrowRight size={16} />
-                    </>
-                  )}
-                </Button>
-              </div>
             </>
           )}
           
@@ -524,6 +504,30 @@ const IngredientsPage = () => {
               </div>
             </>
           )}
+        </div>
+
+        {/* Sticky button container */}
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t md:relative md:border-0 md:p-0 md:mt-8">
+          <div className="container max-w-4xl mx-auto">
+            <Button 
+              onClick={handleGenerateRecipe}
+              className="w-full gap-2 md:w-auto md:float-right"
+              disabled={isGeneratingRecipe}
+              size="lg"
+            >
+              {isGeneratingRecipe ? (
+                <>
+                  <Loader2 size={16} className="mr-2 animate-spin" />
+                  Finding Recipes...
+                </>
+              ) : (
+                <>
+                  Find Recipes
+                  <ArrowRight size={16} />
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </Layout>

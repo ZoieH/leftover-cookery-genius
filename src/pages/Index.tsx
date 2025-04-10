@@ -295,7 +295,7 @@ const Index = () => {
                 <p className="text-sm text-muted-foreground">
                   Have questions? Email us at<br />
                   <a href="mailto:hello@lefto.com" className="text-primary hover:underline">
-                    hello@leftovercookery.com
+                    hello@lefto.com
                   </a>
                 </p>
               </div>
