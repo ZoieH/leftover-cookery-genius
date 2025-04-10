@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { ArrowLeft, Printer, Share2, Info, Play, Video, Circle, Loader2, Plus, Wand2, BookOpen } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { ArrowLeft, Printer, Share2, Info, Play, Video, Circle, Loader2, Plus, Wand2, Minus } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import IngredientCategoryIcon from '@/components/IngredientCategoryIcon';
 import type { Recipe } from '@/types/recipe';
 import Layout from '@/components/Layout';
+import Fraction from 'fraction.js';
 
 const RecipePage = () => {
   const navigate = useNavigate();
@@ -18,48 +19,96 @@ const RecipePage = () => {
   const [loading, setLoading] = useState(true);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [ingredients, setIngredients] = useState<any[]>([]);
-  const [videoMode, setVideoMode] = useState(false);
+  const [imageMode, setImageMode] = useState(false);
   const [showQuantity, setShowQuantity] = useState(true);
   const [scaleMultiplier, setScaleMultiplier] = useState(1);
+  const [baseServings, setBaseServings] = useState<number>(1);
+  const [recipe, setRecipe] = useState<Recipe | null>(null);
+  
+  // The current recipe to display
+  const currentRecipe = recipes[0];
   
   useEffect(() => {
     // Load recipes from session storage
-    const loadRecipes = () => {
-      try {
-        const savedRecipes = sessionStorage.getItem('matching_recipes');
-        if (savedRecipes) {
-          const parsedRecipes = JSON.parse(savedRecipes) as Recipe[];
-          if (parsedRecipes.length > 0) {
-            setRecipes(parsedRecipes);
-            
-            // Convert recipe ingredients to the format expected by the UI
-            const currentRecipe = parsedRecipes[0];
-            setIngredients(currentRecipe.ingredients.map((ing, index) => ({
-              id: index.toString(),
-              name: ing,
-              amount: '1',  // We'll improve this with better data
-              detail: '',
-              checked: false
-            })));
-            
-            setLoading(false);
-            return;
-          }
-        }
-        
-        // If we get here, either no recipes were found or there was an error
-        setLoading(false); // Make sure to set loading to false
-        setRecipes([]); // Set recipes to empty array to trigger the no-recipes view
-        
-      } catch (error) {
-        console.error('Error loading recipes:', error);
-        setLoading(false); // Make sure to set loading to false
-        setRecipes([]); // Set recipes to empty array to trigger the no-recipes view
-      }
-    };
+    const storedRecipes = sessionStorage.getItem('matching_recipes');
+    console.log('Stored recipes from session storage:', storedRecipes);
     
-    loadRecipes();
-  }, [navigate, toast]);
+    if (storedRecipes) {
+      const parsedRecipes = JSON.parse(storedRecipes);
+      console.log('Parsed recipes:', parsedRecipes);
+      setRecipes(parsedRecipes);
+      
+      // Set base servings from the first recipe
+      if (parsedRecipes.length > 0 && parsedRecipes[0].servings) {
+        setBaseServings(Number(parsedRecipes[0].servings));
+      }
+      
+      // Parse ingredients
+      if (parsedRecipes.length > 0 && parsedRecipes[0].ingredients) {
+        const parsedIngredients = parsedRecipes[0].ingredients.map((ingredient: string) => {
+          const match = ingredient.match(/^([\d./\s]+)?\s*([a-zA-Z]+)?\s+(.+)$/);
+          if (match) {
+            const [_, quantity, unit, name] = match;
+            let parsedQuantity = null;
+            if (quantity) {
+              try {
+                // Handle fractions like "1/2" or "1 1/2"
+                const parts = quantity.trim().split(' ');
+                if (parts.length > 1) {
+                  // Mixed number (e.g., "1 1/2")
+                  const whole = parseFloat(parts[0]);
+                  try {
+                    const fraction = new Fraction(parts[1]);
+                    parsedQuantity = whole + fraction.valueOf();
+                  } catch (e) {
+                    parsedQuantity = whole;
+                  }
+                } else if (quantity.includes('/')) {
+                  // Simple fraction (e.g., "1/2")
+                  try {
+                    parsedQuantity = new Fraction(quantity).valueOf();
+                  } catch (e) {
+                    parsedQuantity = parseFloat(quantity) || null;
+                  }
+                } else {
+                  // Simple number
+                  parsedQuantity = parseFloat(quantity);
+                }
+              } catch (e) {
+                console.warn('Failed to parse quantity:', quantity);
+                parsedQuantity = null;
+              }
+            }
+            return {
+              quantity: parsedQuantity,
+              unit: unit || '',
+              name: name.trim()
+            };
+          }
+          return { quantity: null, unit: '', name: ingredient };
+        });
+        console.log('Parsed ingredients:', parsedIngredients);
+        setIngredients(parsedIngredients);
+      }
+    } else {
+      console.log('No recipes found in session storage');
+    }
+    setLoading(false);
+  }, []);
+  
+  // Add console log for recipes state changes
+  useEffect(() => {
+    console.log('Current recipes state:', recipes);
+    console.log('Current recipe:', recipes[0]);
+  }, [recipes]);
+  
+  // Update scale multiplier when servings change
+  useEffect(() => {
+    if (currentRecipe && baseServings > 0) {
+      // Fix: baseServings (what user wants) divided by recipe's original servings
+      setScaleMultiplier(baseServings / Number(currentRecipe.servings));
+    }
+  }, [currentRecipe?.servings, baseServings]);
   
   const handleShare = () => {
     toast({
@@ -86,44 +135,73 @@ const RecipePage = () => {
     setScaleMultiplier(scale);
   };
   
-  // Function to scale ingredient amounts based on multiplier
-  const scaleAmount = (amount: string): string => {
-    if (!amount) return '';
+  const formatIngredient = (ingredient: any) => {
+    if (!showQuantity || ingredient.quantity === null) {
+      return `${ingredient.unit} ${ingredient.name}`.trim();
+    }
     
-    // Extract the numeric part
-    const match = amount.match(/^([\d./]+)(.*)$/);
-    if (!match) return amount;
+    const scaledQuantity = ingredient.quantity * scaleMultiplier;
+    let formattedQuantity;
     
-    let numericPart = match[1];
-    const textPart = match[2];
-    
-    // Handle fractions
-    if (numericPart.includes('/')) {
-      const [numerator, denominator] = numericPart.split('/');
-      const decimal = parseFloat(numerator) / parseFloat(denominator);
-      const scaled = decimal * scaleMultiplier;
+    // Format the number to handle different cases
+    if (Number.isInteger(scaledQuantity)) {
+      // Case 1: Whole numbers (e.g., 1, 2, 3)
+      formattedQuantity = scaledQuantity.toString();
+    } else {
+      // Case 2: Decimal numbers
+      // Convert to decimal with up to 2 decimal places and remove trailing zeros
+      const decimal = Number(scaledQuantity.toFixed(2));
       
-      // Convert back to a nice fraction or decimal
-      if (Math.floor(scaled) === scaled) {
-        return `${scaled}${textPart}`;
+      // Common fractions to display nicely
+      const fractionMap: { [key: number]: string } = {
+        0.25: "¼",
+        0.5: "½",
+        0.75: "¾",
+        0.33: "⅓",
+        0.67: "⅔",
+        0.2: "⅕",
+        0.4: "⅖",
+        0.6: "⅗",
+        0.8: "⅘"
+      };
+      
+      // Check if we have a clean fraction representation
+      const fractionalPart = decimal % 1;
+      const wholePart = Math.floor(decimal);
+      
+      // Find the closest fraction representation
+      const closestFraction = Object.entries(fractionMap).reduce((closest, [value, symbol]) => {
+        const currentDiff = Math.abs(fractionalPart - parseFloat(value));
+        const closestDiff = Math.abs(fractionalPart - closest.value);
+        return currentDiff < closestDiff ? { value: parseFloat(value), symbol } : closest;
+      }, { value: 999, symbol: "" });
+      
+      // If the fractional part is very close to a common fraction (within 0.01)
+      if (Math.abs(fractionalPart - closestFraction.value) < 0.01) {
+        formattedQuantity = wholePart === 0 
+          ? closestFraction.symbol 
+          : `${wholePart}${closestFraction.symbol}`;
       } else {
-        // Approximate as a fraction
-        return `${scaled.toFixed(1)}${textPart}`;
+        // Just use decimal format
+        formattedQuantity = decimal.toString().replace(/\.?0+$/, '');
       }
     }
     
-    // Handle regular numbers
-    const numeric = parseFloat(numericPart);
-    if (isNaN(numeric)) return amount;
-    
-    const scaled = numeric * scaleMultiplier;
-    return `${scaled % 1 === 0 ? scaled : scaled.toFixed(1)}${textPart}`;
+    return `${formattedQuantity} ${ingredient.unit} ${ingredient.name}`.trim();
   };
   
   const handleBackClick = () => {
     // Navigate back to ingredients page with step 2 (recipe list)
     sessionStorage.setItem('ingredients_page_step', '2');
     navigate('/ingredients');
+  };
+  
+  const handleServingChange = (increase: boolean) => {
+    if (increase) {
+      setBaseServings(prev => prev + 1);
+    } else {
+      setBaseServings(prev => Math.max(1, prev - 1));
+    }
   };
   
   if (loading) {
@@ -166,9 +244,6 @@ const RecipePage = () => {
     );
   }
 
-  // The current recipe to display
-  const currentRecipe = recipes[0];
-  
   return (
     <Layout>
       <div className="container max-w-4xl mx-auto p-4 space-y-8">
@@ -312,35 +387,39 @@ const RecipePage = () => {
         {/* Recipe controls */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Label htmlFor="quantity-toggle">Show quantities</Label>
-                <Switch 
-                  id="quantity-toggle" 
-                  checked={showQuantity} 
-                  onCheckedChange={setShowQuantity} 
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  checked={showQuantity}
+                  onCheckedChange={setShowQuantity}
+                  id="quantity-toggle"
                 />
+                <Label htmlFor="quantity-toggle">Show quantities</Label>
               </div>
             </div>
           </Card>
           
           <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Servings:</span>
-              <div className="flex items-center">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-8 w-8 p-0" 
-                  onClick={() => setScale(Math.max(0.5, scaleMultiplier - 0.5))}
-                >-</Button>
-                <span className="w-8 text-center">{scaleMultiplier}</span>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-8 w-8 p-0" 
-                  onClick={() => setScale(Math.min(10, scaleMultiplier + 0.5))}
-                >+</Button>
+            <div className="flex items-center space-x-4">
+              <Label>Servings:</Label>
+              <div className="flex items-center space-x-1">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => handleServingChange(false)}
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <span className="w-12 text-center">
+                  {baseServings}
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => handleServingChange(true)}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
               </div>
             </div>
           </Card>
@@ -351,20 +430,20 @@ const RecipePage = () => {
           <h2 className="text-xl font-semibold mb-4">Ingredients</h2>
           <Card className="p-4">
             <div className="space-y-2">
-              {currentRecipe.ingredients.map((ingredient, index) => (
+              {ingredients.map((ingredient, index) => (
                 <div key={index} className="flex items-start gap-3">
                   <Checkbox 
                     id={`ingredient-${index}`} 
-                    checked={ingredients[index]?.checked || false} 
+                    checked={ingredient.checked || false} 
                     onCheckedChange={() => toggleIngredientCheck(index.toString())}
                     className="mt-0.5"
                   />
                   <div className="flex-1">
                     <label 
                       htmlFor={`ingredient-${index}`} 
-                      className={`${ingredients[index]?.checked ? 'line-through text-muted-foreground' : ''}`}
+                      className={`${ingredient.checked ? 'line-through text-muted-foreground' : ''}`}
                     >
-                      <span className="font-medium">{ingredient}</span>
+                      <span className="font-medium">{formatIngredient(ingredient)}</span>
                     </label>
                   </div>
                 </div>
@@ -378,11 +457,11 @@ const RecipePage = () => {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold">Instructions</h2>
             <div className="flex items-center gap-2">
-              <Label htmlFor="video-toggle" className="text-sm">Video mode</Label>
+              <Label htmlFor="image-toggle" className="text-sm">Image mode</Label>
               <Switch 
-                id="video-toggle" 
-                checked={videoMode} 
-                onCheckedChange={setVideoMode} 
+                id="image-toggle" 
+                checked={imageMode} 
+                onCheckedChange={setImageMode} 
               />
             </div>
           </div>
@@ -391,7 +470,7 @@ const RecipePage = () => {
             {currentRecipe.instructions.map((instruction, index) => (
               <div key={index} className="flex gap-4">
                 <div className="flex-none">
-                  {videoMode ? (
+                  {imageMode ? (
                     <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold">
                       <Play size={16} />
                     </div>

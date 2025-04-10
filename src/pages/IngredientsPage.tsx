@@ -296,37 +296,46 @@ const IngredientsPage = () => {
                     {ingredients.map(ingredient => (
                       <div key={ingredient.id} className="ingredient-item">
                         {editing === ingredient.id ? (
-                          <div className="flex items-center gap-2 w-full">
-                            <Input 
-                              value={tempIngredient.name}
-                              onChange={(e) => setTempIngredient({...tempIngredient, name: e.target.value})}
-                              className="flex-1"
-                            />
-                            <Input 
-                              value={tempIngredient.quantity}
-                              onChange={(e) => setTempIngredient({...tempIngredient, quantity: e.target.value})}
-                              className="w-16"
-                              type="number"
-                            />
-                            <Select 
-                              value={tempIngredient.unit}
-                              onValueChange={(value) => setTempIngredient({...tempIngredient, unit: value})}
-                            >
-                              <SelectTrigger className="w-24">
-                                <SelectValue placeholder="Unit" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="g">g</SelectItem>
-                                <SelectItem value="kg">kg</SelectItem>
-                                <SelectItem value="ml">ml</SelectItem>
-                                <SelectItem value="l">l</SelectItem>
-                                <SelectItem value="pieces">pieces</SelectItem>
-                                <SelectItem value="cups">cups</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <div className="flex gap-2">
-                              <Button size="sm" variant="outline" onClick={cancelEdit}>Cancel</Button>
-                              <Button size="sm" onClick={saveEdit}>Save</Button>
+                          <div className="flex flex-col gap-3 w-full">
+                            <div className="flex items-center gap-2">
+                              <Input 
+                                value={tempIngredient.name}
+                                onChange={(e) => setTempIngredient({
+                                  ...tempIngredient, 
+                                  name: e.target.value
+                                })}
+                                className="flex-1"
+                                placeholder="Ingredient name"
+                              />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Input 
+                                value={tempIngredient.quantity}
+                                onChange={(e) => setTempIngredient({...tempIngredient, quantity: e.target.value})}
+                                className="w-20"
+                                type="number"
+                                placeholder="Qty"
+                              />
+                              <Select 
+                                value={tempIngredient.unit}
+                                onValueChange={(value) => setTempIngredient({...tempIngredient, unit: value})}
+                              >
+                                <SelectTrigger className="w-28">
+                                  <SelectValue placeholder="Unit" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="g">g</SelectItem>
+                                  <SelectItem value="kg">kg</SelectItem>
+                                  <SelectItem value="ml">ml</SelectItem>
+                                  <SelectItem value="l">l</SelectItem>
+                                  <SelectItem value="pieces">pieces</SelectItem>
+                                  <SelectItem value="cups">cups</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <div className="flex gap-2 ml-auto">
+                                <Button size="sm" variant="outline" onClick={cancelEdit}>Cancel</Button>
+                                <Button size="sm" onClick={saveEdit}>Save</Button>
+                              </div>
                             </div>
                           </div>
                         ) : (
@@ -380,40 +389,47 @@ const IngredientsPage = () => {
                     {/* Add New Ingredient Form */}
                     {isAddingNewIngredient && (
                       <div className="ingredient-item bg-muted/20 rounded-md p-3 mt-4">
-                        <div className="flex items-center gap-2 w-full">
-                          <Input 
-                            value={tempIngredient.name}
-                            onChange={(e) => setTempIngredient({...tempIngredient, name: e.target.value})}
-                            placeholder="Ingredient name"
-                            className="flex-1"
-                            autoFocus
-                          />
-                          <Input 
-                            value={tempIngredient.quantity}
-                            onChange={(e) => setTempIngredient({...tempIngredient, quantity: e.target.value})}
-                            placeholder="Qty"
-                            className="w-16"
-                            type="number"
-                          />
-                          <Select 
-                            value={tempIngredient.unit}
-                            onValueChange={(value) => setTempIngredient({...tempIngredient, unit: value})}
-                          >
-                            <SelectTrigger className="w-24">
-                              <SelectValue placeholder="Unit" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="g">g</SelectItem>
-                              <SelectItem value="kg">kg</SelectItem>
-                              <SelectItem value="ml">ml</SelectItem>
-                              <SelectItem value="l">l</SelectItem>
-                              <SelectItem value="pieces">pieces</SelectItem>
-                              <SelectItem value="cups">cups</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <div className="flex gap-2">
-                            <Button size="sm" variant="outline" onClick={cancelEdit}>Cancel</Button>
-                            <Button size="sm" onClick={saveNewIngredient}>Add</Button>
+                        <div className="flex flex-col gap-3 w-full">
+                          <div className="flex items-center gap-2">
+                            <Input 
+                              value={tempIngredient.name}
+                              onChange={(e) => setTempIngredient({
+                                ...tempIngredient, 
+                                name: e.target.value
+                              })}
+                              placeholder="Ingredient name"
+                              className="flex-1"
+                              autoFocus
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Input 
+                              value={tempIngredient.quantity}
+                              onChange={(e) => setTempIngredient({...tempIngredient, quantity: e.target.value})}
+                              placeholder="Qty"
+                              className="w-20"
+                              type="number"
+                            />
+                            <Select 
+                              value={tempIngredient.unit}
+                              onValueChange={(value) => setTempIngredient({...tempIngredient, unit: value})}
+                            >
+                              <SelectTrigger className="w-28">
+                                <SelectValue placeholder="Unit" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="g">g</SelectItem>
+                                <SelectItem value="kg">kg</SelectItem>
+                                <SelectItem value="ml">ml</SelectItem>
+                                <SelectItem value="l">l</SelectItem>
+                                <SelectItem value="pieces">pieces</SelectItem>
+                                <SelectItem value="cups">cups</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <div className="flex gap-2 ml-auto">
+                              <Button size="sm" variant="outline" onClick={cancelEdit}>Cancel</Button>
+                              <Button size="sm" onClick={saveNewIngredient}>Add</Button>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -489,6 +505,7 @@ const IngredientsPage = () => {
               <IngredientBasedRecommendations 
                 ingredients={getSelectedIngredientNames()}
                 dietaryFilter={dietaryPreference}
+                calorieLimit={calorieLimit ? parseInt(calorieLimit) : undefined}
                 onSelectRecipe={handleSelectRecipe}
               />
               
@@ -507,27 +524,29 @@ const IngredientsPage = () => {
         </div>
 
         {/* Sticky button container */}
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t md:relative md:border-0 md:p-0 md:mt-8">
-          <div className="container max-w-4xl mx-auto md:flex md:justify-center">
-            <Button 
-              onClick={handleGenerateRecipe}
-              className="w-full gap-2 md:w-auto"
-              disabled={isGeneratingRecipe}
-            >
-              {isGeneratingRecipe ? (
-                <>
-                  <Loader2 size={16} className="mr-2 animate-spin" />
-                  Finding Recipes...
-                </>
-              ) : (
-                <>
-                  Find Recipes
-                  <ArrowRight size={16} />
-                </>
-              )}
-            </Button>
+        {currentStep === 1 && (
+          <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t md:relative md:border-0 md:p-0 md:mt-8">
+            <div className="container max-w-4xl mx-auto md:flex md:justify-center">
+              <Button 
+                onClick={handleGenerateRecipe}
+                className="w-full gap-2 md:w-auto"
+                disabled={isGeneratingRecipe}
+              >
+                {isGeneratingRecipe ? (
+                  <>
+                    <Loader2 size={16} className="mr-2 animate-spin" />
+                    Finding Recipes...
+                  </>
+                ) : (
+                  <>
+                    Find Recipes
+                    <ArrowRight size={16} />
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </Layout>
   );

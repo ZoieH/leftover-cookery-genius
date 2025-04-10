@@ -14,7 +14,8 @@ import { toast } from '@/components/ui/use-toast';
 interface IngredientBasedRecommendationsProps {
   ingredients: string[];
   dietaryFilter?: string;
-  onSelectRecipe?: (recipe: Recipe) => void;
+  calorieLimit?: number;
+  onSelectRecipe: (recipe: Recipe) => void;
 }
 
 // Helper function to generate cache key
@@ -38,6 +39,7 @@ const clearRecipeCache = () => {
 const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = ({
   ingredients,
   dietaryFilter,
+  calorieLimit,
   onSelectRecipe
 }) => {
   const [isLoading, setIsLoading] = useState(false);
@@ -46,6 +48,12 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
   const [expandedRecipeId, setExpandedRecipeId] = useState<Recipe['id']>(null);
   const [useCache, setUseCache] = useState(true);
   const { toast } = useToast();
+
+  // Function to truncate description
+  const truncateDescription = (description: string, maxLength: number = 150) => {
+    if (description.length <= maxLength) return description;
+    return description.slice(0, maxLength).trim() + '...';
+  };
 
   const loadRecommendations = async (showToast: boolean = false, forceFresh: boolean = false) => {
     if (ingredients.length === 0) {
@@ -101,22 +109,53 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
               variant: 'destructive',
             });
           }
+          allRecipes = []; // Initialize to empty array if API call fails
         }
       }
       
-      // Split into exact matches (100% match) and alternatives (partial matches)
-      const exactMatches = allRecipes.filter(recipe => 
-        calculateIngredientCoverage(recipe, ingredients) === 1
-      );
+      // Helper function to check if recipe meets dietary and calorie requirements
+      const meetsRequirements = (recipe: Recipe) => {
+        // Check calorie limit if specified
+        if (calorieLimit && recipe.calories && recipe.calories > calorieLimit) {
+          return false;
+        }
+        // Check dietary requirements if specified
+        if (dietaryFilter && dietaryFilter !== 'none' && !recipe.dietaryTags.includes(dietaryFilter)) {
+          return false;
+        }
+        return true;
+      };
+
+      // Split recipes into recommendations and alternatives
+      const exactMatches = allRecipes.filter(recipe => {
+        const coverage = calculateIngredientCoverage(recipe, ingredients);
+        return coverage >= 0.3 && meetsRequirements(recipe);
+      });
       
-      const alternatives = allRecipes
-        .filter(recipe => 
-          calculateIngredientCoverage(recipe, ingredients) < 1
-        )
-        .sort((a, b) => 
-          calculateIngredientCoverage(b, ingredients) - calculateIngredientCoverage(a, ingredients)
-        )
-        .slice(0, 5); // Show top 5 alternatives
+      const potentialAlternatives = allRecipes
+        .filter(recipe => {
+          const coverage = calculateIngredientCoverage(recipe, ingredients);
+          // Include recipes that either:
+          // 1. Have less than 30% ingredient match but meet dietary/calorie requirements
+          // 2. Have good ingredient match but don't meet dietary/calorie requirements
+          return (coverage < 0.3 && meetsRequirements(recipe)) || 
+                 (coverage >= 0.3 && !meetsRequirements(recipe));
+        })
+        .sort((a, b) => {
+          // Sort by ingredient coverage first
+          const coverageA = calculateIngredientCoverage(a, ingredients);
+          const coverageB = calculateIngredientCoverage(b, ingredients);
+          if (Math.abs(coverageB - coverageA) > 0.1) { // If coverage difference is significant
+            return coverageB - coverageA;
+          }
+          // If coverage is similar, prioritize recipes that meet requirements
+          return Number(meetsRequirements(b)) - Number(meetsRequirements(a));
+        });
+
+      // Calculate how many alternatives we need to show to reach minimum of 3 total recipes
+      const minTotalRecipes = 3;
+      const alternativesNeeded = Math.max(0, minTotalRecipes - exactMatches.length);
+      const alternatives = potentialAlternatives.slice(0, Math.max(alternativesNeeded, 2)); // Show at least 2 alternatives if available
       
       setRecommendations(exactMatches);
       setAlternativeRecipes(alternatives);
@@ -125,7 +164,7 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
         toast({
           title: "No Exact Matches Found",
           description: alternatives.length > 0 
-            ? "Here are some recipes you might like based on your ingredients."
+            ? "Here are some alternative recipes you might like based on your ingredients."
             : "We couldn't find any recipes. Try adding different ingredients or adjusting your filters.",
           variant: alternatives.length > 0 ? "default" : "destructive",
         });
@@ -216,11 +255,24 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
                       isExpanded && "ring-2 ring-primary"
                     )}>
                       <CardHeader>
-                        <div className="flex justify-between items-start">
-                          <div>
+                        <div className="flex justify-between items-start gap-4">
+                          {recipe.image && (
+                            <div className="flex-shrink-0 w-24 h-24 rounded-md overflow-hidden">
+                              <img 
+                                src={recipe.image}
+                                alt={recipe.title}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                }}
+                              />
+                            </div>
+                          )}
+                          <div className="flex-1">
                             <CardTitle>{recipe.title}</CardTitle>
                             <CardDescription className="mt-1">
-                              {recipe.description}
+                              {isExpanded ? recipe.description : truncateDescription(recipe.description)}
                             </CardDescription>
                           </div>
                           <Button
@@ -308,11 +360,24 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
                 isExpanded && "ring-2 ring-primary"
               )}>
                 <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
+                  <div className="flex justify-between items-start gap-4">
+                    {recipe.image && (
+                      <div className="flex-shrink-0 w-24 h-24 rounded-md overflow-hidden">
+                        <img 
+                          src={recipe.image}
+                          alt={recipe.title}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
+                    <div className="flex-1">
                       <CardTitle>{recipe.title}</CardTitle>
                       <CardDescription className="mt-1">
-                        {recipe.description}
+                        {isExpanded ? recipe.description : truncateDescription(recipe.description)}
                       </CardDescription>
                     </div>
                     <Button
