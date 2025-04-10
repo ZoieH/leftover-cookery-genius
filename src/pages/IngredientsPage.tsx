@@ -508,12 +508,11 @@ const IngredientsPage = () => {
 
         {/* Sticky button container */}
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t md:relative md:border-0 md:p-0 md:mt-8">
-          <div className="container max-w-4xl mx-auto">
+          <div className="container max-w-4xl mx-auto md:flex md:justify-center">
             <Button 
               onClick={handleGenerateRecipe}
-              className="w-full gap-2 md:w-auto md:float-right"
+              className="w-full gap-2 md:w-auto"
               disabled={isGeneratingRecipe}
-              size="lg"
             >
               {isGeneratingRecipe ? (
                 <>
