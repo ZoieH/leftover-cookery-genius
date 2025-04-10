@@ -106,7 +106,7 @@ export async function searchSpoonacularRecipes(
     const params = new URLSearchParams({
       apiKey: API_KEY,
       ingredients: ingredients.join(','),
-      number: '5',
+      number: '3',
       ranking: '2', // Maximize used ingredients
       ignorePantry: 'true'
     });
