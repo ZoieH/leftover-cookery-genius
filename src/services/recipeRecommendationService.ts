@@ -35,7 +35,6 @@ export const recommendRecipesFromIngredients = async (
   options: RecommendationOptions = {}
 ): Promise<Recipe[]> => {
   const {
-    threshold = 0.05,
     maxResults = 10
   } = options;
 
@@ -47,21 +46,16 @@ export const recommendRecipesFromIngredients = async (
       maxResults: maxResults
     });
 
-    // Filter and sort local recipes
-    const filteredLocalRecipes = localRecipes
-      .filter(recipe => {
-        const coverage = calculateIngredientCoverage(recipe, ingredients);
-        const hasAtLeastOneMatch = countMatchingIngredients(recipe, ingredients) > 0;
-        return coverage >= threshold && hasAtLeastOneMatch;
-      })
+    // Sort local recipes by coverage
+    const sortedLocalRecipes = localRecipes
       .sort((a, b) => {
         const coverageA = calculateIngredientCoverage(a, ingredients);
         const coverageB = calculateIngredientCoverage(b, ingredients);
         return coverageB - coverageA;
       });
 
-    if (filteredLocalRecipes.length > 0) {
-      return filteredLocalRecipes.slice(0, maxResults);
+    if (sortedLocalRecipes.length > 0) {
+      return sortedLocalRecipes.slice(0, maxResults);
     }
 
     // Layer 2: Try Spoonacular API
@@ -70,26 +64,20 @@ export const recommendRecipesFromIngredients = async (
       const spoonacularRecipes = await searchSpoonacularRecipes(ingredients, dietaryFilter);
       console.log('📊 [RECIPE-SERVICE] Spoonacular recipes received:', spoonacularRecipes.length);
       
-      // For Spoonacular recipes, we'll be more lenient with filtering
-      const filteredSpoonacularRecipes = spoonacularRecipes
-        .filter(recipe => {
-          const coverage = calculateIngredientCoverage(recipe, ingredients);
-          const hasAtLeastOneMatch = countMatchingIngredients(recipe, ingredients) > 0;
-          // More lenient threshold for Spoonacular recipes
-          return coverage >= 0.05 && hasAtLeastOneMatch;
-        })
+      // Sort Spoonacular recipes by coverage without filtering
+      const sortedSpoonacularRecipes = spoonacularRecipes
         .sort((a, b) => {
           const coverageA = calculateIngredientCoverage(a, ingredients);
           const coverageB = calculateIngredientCoverage(b, ingredients);
           return coverageB - coverageA;
         });
 
-      console.log('📊 [RECIPE-SERVICE] Filtered Spoonacular recipes:', filteredSpoonacularRecipes.length);
+      console.log('📊 [RECIPE-SERVICE] Sorted Spoonacular recipes:', sortedSpoonacularRecipes.length);
 
-      if (filteredSpoonacularRecipes.length > 0) {
-        return filteredSpoonacularRecipes.slice(0, maxResults);
+      if (sortedSpoonacularRecipes.length > 0) {
+        return sortedSpoonacularRecipes.slice(0, maxResults);
       }
-      console.log('⚠️ [RECIPE-SERVICE] No matching Spoonacular recipes found, trying ChatGPT...');
+      console.log('⚠️ [RECIPE-SERVICE] No Spoonacular recipes found, trying ChatGPT...');
     } catch (error) {
       console.warn('Spoonacular API error:', error);
       console.log('Spoonacular API failed, falling back to ChatGPT...');

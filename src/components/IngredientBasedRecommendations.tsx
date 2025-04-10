@@ -110,15 +110,13 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
       );
       
       const alternatives = allRecipes
-        .filter(recipe => {
-          const coverage = calculateIngredientCoverage(recipe, ingredients);
-          // Include recipes with 30-90% match that aren't exact matches
-          return coverage >= 0.3 && coverage < 1;
-        })
+        .filter(recipe => 
+          calculateIngredientCoverage(recipe, ingredients) < 1
+        )
         .sort((a, b) => 
           calculateIngredientCoverage(b, ingredients) - calculateIngredientCoverage(a, ingredients)
         )
-        .slice(0, 3); // Take top 3 alternatives
+        .slice(0, 5); // Show top 5 alternatives
       
       setRecommendations(exactMatches);
       setAlternativeRecipes(alternatives);
@@ -127,8 +125,8 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
         toast({
           title: "No Exact Matches Found",
           description: alternatives.length > 0 
-            ? "We couldn't find recipes matching all your ingredients, but here are some alternatives you might like."
-            : "We couldn't find any recipes matching your ingredients. Try adding more ingredients or adjusting your filters.",
+            ? "Here are some recipes you might like based on your ingredients."
+            : "We couldn't find any recipes. Try adding different ingredients or adjusting your filters.",
           variant: alternatives.length > 0 ? "default" : "destructive",
         });
       }
