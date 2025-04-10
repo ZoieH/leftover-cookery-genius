@@ -35,7 +35,7 @@ export const recommendRecipesFromIngredients = async (
   options: RecommendationOptions = {}
 ): Promise<Recipe[]> => {
   const {
-    threshold = 0.2,
+    threshold = 0.05,
     maxResults = 10
   } = options;
 
@@ -66,15 +66,17 @@ export const recommendRecipesFromIngredients = async (
 
     // Layer 2: Try Spoonacular API
     try {
-      console.log('Attempting to fetch recipes from Spoonacular...');
+      console.log('🔍 [RECIPE-SERVICE] Attempting to fetch recipes from Spoonacular...');
       const spoonacularRecipes = await searchSpoonacularRecipes(ingredients, dietaryFilter);
-      console.log('Spoonacular recipes received:', spoonacularRecipes.length);
+      console.log('📊 [RECIPE-SERVICE] Spoonacular recipes received:', spoonacularRecipes.length);
       
+      // For Spoonacular recipes, we'll be more lenient with filtering
       const filteredSpoonacularRecipes = spoonacularRecipes
         .filter(recipe => {
           const coverage = calculateIngredientCoverage(recipe, ingredients);
           const hasAtLeastOneMatch = countMatchingIngredients(recipe, ingredients) > 0;
-          return coverage >= threshold && hasAtLeastOneMatch;
+          // More lenient threshold for Spoonacular recipes
+          return coverage >= 0.05 && hasAtLeastOneMatch;
         })
         .sort((a, b) => {
           const coverageA = calculateIngredientCoverage(a, ingredients);
@@ -82,10 +84,12 @@ export const recommendRecipesFromIngredients = async (
           return coverageB - coverageA;
         });
 
+      console.log('📊 [RECIPE-SERVICE] Filtered Spoonacular recipes:', filteredSpoonacularRecipes.length);
+
       if (filteredSpoonacularRecipes.length > 0) {
         return filteredSpoonacularRecipes.slice(0, maxResults);
       }
-      console.log('No matching Spoonacular recipes found, trying ChatGPT...');
+      console.log('⚠️ [RECIPE-SERVICE] No matching Spoonacular recipes found, trying ChatGPT...');
     } catch (error) {
       console.warn('Spoonacular API error:', error);
       console.log('Spoonacular API failed, falling back to ChatGPT...');
