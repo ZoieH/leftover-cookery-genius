@@ -16,7 +16,6 @@ const RecipePage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
-  const [currentRecipeIndex, setCurrentRecipeIndex] = useState(0);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [ingredients, setIngredients] = useState<any[]>([]);
   const [videoMode, setVideoMode] = useState(false);
@@ -62,22 +61,6 @@ const RecipePage = () => {
     loadRecipes();
   }, [navigate, toast]);
   
-  // When currentRecipeIndex changes, update the ingredients
-  useEffect(() => {
-    if (recipes.length > 0) {
-      const currentRecipe = recipes[currentRecipeIndex];
-      
-      // Convert recipe ingredients to the format expected by the UI
-      setIngredients(currentRecipe.ingredients.map((ing, index) => ({
-        id: index.toString(),
-        name: ing,
-        amount: '1',  // We'll improve this with better data
-        detail: '',
-        checked: false
-      })));
-    }
-  }, [currentRecipeIndex, recipes]);
-  
   const handleShare = () => {
     toast({
       title: "Share feature",
@@ -103,18 +86,6 @@ const RecipePage = () => {
     setScaleMultiplier(scale);
   };
   
-  const nextRecipe = () => {
-    if (currentRecipeIndex < recipes.length - 1) {
-      setCurrentRecipeIndex(currentRecipeIndex + 1);
-    }
-  };
-  
-  const previousRecipe = () => {
-    if (currentRecipeIndex > 0) {
-      setCurrentRecipeIndex(currentRecipeIndex - 1);
-    }
-  };
-  
   // Function to scale ingredient amounts based on multiplier
   const scaleAmount = (amount: string): string => {
     if (!amount) return '';
@@ -134,7 +105,6 @@ const RecipePage = () => {
       
       // Convert back to a nice fraction or decimal
       if (Math.floor(scaled) === scaled) {
-        // It's a whole number
         return `${scaled}${textPart}`;
       } else {
         // Approximate as a fraction
@@ -196,39 +166,8 @@ const RecipePage = () => {
     );
   }
 
-  if (currentRecipeIndex === -1) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[calc(100vh-4rem)] p-4">
-        <div className="text-center max-w-md space-y-4">
-          <h2 className="text-2xl font-semibold">No Exact Recipe Matches</h2>
-          <p className="text-muted-foreground">
-            We couldn't find any recipes that exactly match your ingredients. Try:
-          </p>
-          <div className="flex flex-col gap-2">
-            <Button
-              variant="outline"
-              onClick={() => navigate('/suggestions')}
-              className="w-full"
-            >
-              <Wand2 className="h-4 w-4 mr-2" />
-              Get AI Suggestions
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => navigate('/recipes')}
-              className="w-full"
-            >
-              <BookOpen className="h-4 w-4 mr-2" />
-              Browse All Recipes
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // The current recipe to display
-  const currentRecipe = recipes[currentRecipeIndex];
+  const currentRecipe = recipes[0];
   
   return (
     <Layout>
@@ -250,26 +189,6 @@ const RecipePage = () => {
               <Share2 className="h-4 w-4" />
             </Button>
           </div>
-        </div>
-        
-        <div className="flex justify-between items-center mb-6">
-          <Button 
-            variant="ghost" 
-            onClick={previousRecipe}
-            disabled={currentRecipeIndex === 0}
-          >
-            Previous Recipe
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            {currentRecipeIndex + 1} of {recipes.length}
-          </span>
-          <Button 
-            variant="ghost" 
-            onClick={nextRecipe}
-            disabled={currentRecipeIndex === recipes.length - 1}
-          >
-            Next Recipe
-          </Button>
         </div>
         
         {/* Hero section with image */}
