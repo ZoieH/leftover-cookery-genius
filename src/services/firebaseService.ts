@@ -1,7 +1,21 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, getDocs, addDoc, query, where } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, addDoc, query, where, updateDoc } from 'firebase/firestore';
 import type { LocalRecipe, RecipeSearchParams, Recipe } from '@/types/recipe';
 import { RecipeSource } from '@/types/recipe';
+import { 
+  getAuth, 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  GoogleAuthProvider,
+  signInWithPopup,
+  User,
+  sendSignInLinkToEmail,
+  isSignInWithEmailLink,
+  signInWithEmailLink
+} from 'firebase/auth';
+import { create } from 'zustand';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -15,10 +29,43 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+export const db = getFirestore(app);
+const auth = getAuth(app);
+const googleProvider = new GoogleAuthProvider();
 
-// Collection reference
+// Collection references
 const recipesCollection = collection(db, 'recipes');
+const usersCollection = collection(db, 'users');
+
+// Email link authentication settings
+const actionCodeSettings = {
+  // URL you want to redirect back to. The domain (www.example.com) for this
+  // URL must be in the authorized domains list in the Firebase Console.
+  url: window.location.origin + '/auth/email-link',
+  // This must be true.
+  handleCodeInApp: true,
+};
+
+// Auth store
+interface AuthStore {
+  user: User | null;
+  loading: boolean;
+  setUser: (user: User | null) => void;
+  setLoading: (loading: boolean) => void;
+}
+
+export const useAuthStore = create<AuthStore>((set) => ({
+  user: null,
+  loading: true,
+  setUser: (user) => set({ user }),
+  setLoading: (loading) => set({ loading })
+}));
+
+// Auth state observer
+onAuthStateChanged(auth, (user) => {
+  useAuthStore.getState().setUser(user);
+  useAuthStore.getState().setLoading(false);
+});
 
 /**
  * Get all recipes from Firestore
@@ -118,4 +165,150 @@ export async function searchRecipes(params: RecipeSearchParams): Promise<LocalRe
   }
   
   return matchingRecipes;
-} 
+}
+
+// Auth methods
+export const signUpWithEmail = async (email: string, password: string) => {
+  try {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    return { user: userCredential.user, error: null };
+  } catch (error: any) {
+    return { user: null, error: error.message };
+  }
+};
+
+export const signInWithEmail = async (email: string, password: string) => {
+  try {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    return { user: userCredential.user, error: null };
+  } catch (error: any) {
+    return { user: null, error: error.message };
+  }
+};
+
+export const signInWithGoogle = async () => {
+  try {
+    const result = await signInWithPopup(auth, googleProvider);
+    return { user: result.user, error: null };
+  } catch (error: any) {
+    return { user: null, error: error.message };
+  }
+};
+
+export const signOutUser = async () => {
+  try {
+    await signOut(auth);
+    return { error: null };
+  } catch (error: any) {
+    return { error: error.message };
+  }
+};
+
+// Email link authentication methods
+export const sendSignInLink = async (email: string) => {
+  try {
+    await sendSignInLinkToEmail(auth, email, actionCodeSettings);
+    // Save the email for later use
+    window.localStorage.setItem('emailForSignIn', email);
+    return { error: null };
+  } catch (error: any) {
+    return { error: error.message };
+  }
+};
+
+export const completeSignInWithEmailLink = async () => {
+  try {
+    // Get the saved email from localStorage
+    const email = window.localStorage.getItem('emailForSignIn');
+    if (!email) {
+      return { 
+        user: null, 
+        error: 'No email found. Please try signing in again.' 
+      };
+    }
+
+    // Check if the link is a sign-in with email link
+    if (!isSignInWithEmailLink(auth, window.location.href)) {
+      return { 
+        user: null, 
+        error: 'Invalid sign-in link.' 
+      };
+    }
+
+    // Sign in the user
+    const result = await signInWithEmailLink(auth, email, window.location.href);
+    
+    // Clear the email from storage
+    window.localStorage.removeItem('emailForSignIn');
+    
+    return { user: result.user, error: null };
+  } catch (error: any) {
+    return { user: null, error: error.message };
+  }
+};
+
+// Helper functions
+export const getCurrentUser = () => auth.currentUser;
+
+export const isUserPremium = async (user: User | null): Promise<boolean> => {
+  if (!user) return false;
+  
+  try {
+    // Query the users collection for the current user's premium status
+    const userQuery = query(usersCollection, where('uid', '==', user.uid));
+    const querySnapshot = await getDocs(userQuery);
+    
+    if (querySnapshot.empty) {
+      // If no document exists, create one with default premium status
+      await addDoc(usersCollection, {
+        uid: user.uid,
+        email: user.email,
+        isPremium: false,
+        createdAt: new Date().toISOString()
+      });
+      return false;
+    }
+    
+    // Get the first document (there should only be one per user)
+    const userDoc = querySnapshot.docs[0];
+    return userDoc.data().isPremium || false;
+  } catch (error) {
+    console.error('Error checking premium status:', error);
+    return false;
+  }
+};
+
+export const upgradeToPremium = async (user: User | null): Promise<{ success: boolean; error?: string }> => {
+  if (!user) {
+    return { success: false, error: 'No user logged in' };
+  }
+
+  try {
+    // Query the users collection for the current user
+    const userQuery = query(usersCollection, where('uid', '==', user.uid));
+    const querySnapshot = await getDocs(userQuery);
+    
+    if (querySnapshot.empty) {
+      // Create new user document with premium status
+      await addDoc(usersCollection, {
+        uid: user.uid,
+        email: user.email,
+        isPremium: true,
+        premiumSince: new Date().toISOString(),
+        createdAt: new Date().toISOString()
+      });
+    } else {
+      // Update existing user document
+      const userDoc = querySnapshot.docs[0];
+      await updateDoc(userDoc.ref, {
+        isPremium: true,
+        premiumSince: new Date().toISOString()
+      });
+    }
+    
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error upgrading to premium:', error);
+    return { success: false, error: error.message };
+  }
+}; 

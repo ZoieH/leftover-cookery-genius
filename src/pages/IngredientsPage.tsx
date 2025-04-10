@@ -18,6 +18,10 @@ import IngredientBasedRecommendations from '@/components/IngredientBasedRecommen
 import type { Recipe } from '@/types/recipe';
 import { cn } from '@/lib/utils';
 import Layout from '@/components/Layout';
+import { useUsageStore, canPerformSearch, getRemainingSearches, canUsePremiumFeature } from '@/services/usageService';
+import PaywallModal from '@/components/PaywallModal';
+import { useAuthStore } from '@/services/firebaseService';
+import AuthModal from '@/components/AuthModal';
 
 // Type for ingredient objects
 type Ingredient = {
@@ -75,9 +79,32 @@ const IngredientsPage = () => {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [isGeneratingRecipe, setIsGeneratingRecipe] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+  const [paywallOpen, setPaywallOpen] = useState(false);
+  const [paywallFeature, setPaywallFeature] = useState<string>('');
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [isPremiumUser, setIsPremiumUser] = useState(false);
+  const { user } = useAuthStore();
   
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { incrementSearchCount, isPremium } = useUsageStore();
+  
+  // Check premium status on component mount and when isPremium changes
+  useEffect(() => {
+    const checkPremiumStatus = async () => {
+      const hasPremium = await canUsePremiumFeature();
+      setIsPremiumUser(hasPremium);
+      
+      // Update remaining searches text
+      const remainingElement = document.getElementById('remaining-searches');
+      if (remainingElement) {
+        const remaining = await getRemainingSearches();
+        remainingElement.textContent = `${remaining} searches remaining today.`;
+      }
+    };
+    
+    checkPremiumStatus();
+  }, [isPremium]);
   
   // Load ingredients and step when component mounts
   useEffect(() => {
@@ -195,20 +222,68 @@ const IngredientsPage = () => {
     setIsAddingNewIngredient(false);
   };
   
-  const handleGenerateRecipe = async () => {
-    // Check if we have at least one ingredient selected
+  const showPaywall = (feature: string) => {
+    if (!user) {
+      setAuthModalOpen(true);
+      setPaywallFeature(feature);
+    } else {
+      setPaywallOpen(true);
+      setPaywallFeature(feature);
+    }
+  };
+
+  const handleDietaryChange = async (value: DietaryPreference) => {
+    // Only vegetarian and none are free; others require premium
+    if (!['none', 'vegetarian'].includes(value)) {
+      const isPremium = await canUsePremiumFeature();
+      if (!isPremium) {
+        showPaywall('Dietary preference filter');
+        return;
+      }
+    }
+    setDietaryPreference(value);
+  };
+
+  const handleCalorieChange = async (value: string) => {
+    const isPremium = await canUsePremiumFeature();
+    if (!isPremium) {
+      showPaywall('Calorie control');
+      return;
+    }
+    setCalorieLimit(value);
+  };
+
+  const handleFindRecipes = async () => {
+    const canSearch = await canPerformSearch();
+    if (!canSearch) {
+      showPaywall('Unlimited recipe searches');
+      return;
+    }
+
+    // Increment search count
+    incrementSearchCount();
+
+    // Proceed with recipe search
     const selectedIngredients = ingredients.filter(ing => ing.selected);
-    
     if (selectedIngredients.length === 0) {
       toast({
-        title: "No ingredients selected",
-        description: "Please select at least one ingredient to generate a recipe.",
-        variant: "destructive"
+        title: "No Ingredients Selected",
+        description: "Please select at least one ingredient to find recipes.",
+        variant: "destructive",
       });
       return;
     }
 
-    // Move to step 2 (recommendations) instead of step 3
+    // Save selected ingredients to session storage
+    sessionStorage.setItem('selected_ingredients', JSON.stringify(selectedIngredients));
+    
+    // Check premium status for dietary and calorie filters
+    const isPremium = await canUsePremiumFeature();
+    
+    // Only include dietary and calorie filters if premium
+    sessionStorage.setItem('dietary_preference', isPremium ? dietaryPreference : 'none');
+    sessionStorage.setItem('calorie_limit', isPremium ? calorieLimit : '');
+    
     setCurrentStep(2);
   };
 
@@ -286,6 +361,25 @@ const IngredientsPage = () => {
             </div>
           </div>
 
+          {/* Show remaining searches for free users */}
+          {!isPremiumUser && (
+            <div className="mb-4 p-4 bg-muted rounded-lg">
+              <p className="text-sm text-muted-foreground">
+                <span id="remaining-searches">
+                  {/* This will be populated by effect */}
+                  Loading search count...
+                </span>{' '}
+                <Button 
+                  variant="link" 
+                  className="p-0 h-auto font-normal text-primary"
+                  onClick={() => navigate('/upgrade')}
+                >
+                  Upgrade to premium
+                </Button>
+              </p>
+            </div>
+          )}
+
           {/* Step 1: Combined ingredients and preferences */}
           {currentStep === 1 && (
             <>
@@ -302,10 +396,11 @@ const IngredientsPage = () => {
                                 value={tempIngredient.name}
                                 onChange={(e) => setTempIngredient({
                                   ...tempIngredient, 
-                                  name: e.target.value
+                                  name: e.target.value.slice(0, 50)
                                 })}
-                                className="flex-1"
+                                className="flex-1 min-h-[4rem] text-base py-2 px-3 resize-none"
                                 placeholder="Ingredient name"
+                                style={{ height: 'auto', minHeight: '4rem' }}
                               />
                             </div>
                             <div className="flex items-center gap-2">
@@ -395,10 +490,11 @@ const IngredientsPage = () => {
                               value={tempIngredient.name}
                               onChange={(e) => setTempIngredient({
                                 ...tempIngredient, 
-                                name: e.target.value
+                                name: e.target.value.slice(0, 50)
                               })}
                               placeholder="Ingredient name"
-                              className="flex-1"
+                              className="flex-1 min-h-[4rem] text-base py-2 px-3 resize-none"
+                              style={{ height: 'auto', minHeight: '4rem' }}
                               autoFocus
                             />
                           </div>
@@ -454,10 +550,17 @@ const IngredientsPage = () => {
               <div className="grid gap-6 md:grid-cols-2 mb-8">
                 <Card>
                   <CardContent className="pt-6">
-                    <h3 className="text-lg font-medium mb-3">Dietary Requirements</h3>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-lg font-medium">Dietary Requirements</h3>
+                      {dietaryPreference && !['none', 'vegetarian'].includes(dietaryPreference) && (
+                        <span className="text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">
+                          PRO
+                        </span>
+                      )}
+                    </div>
                     <Select 
                       value={dietaryPreference} 
-                      onValueChange={(value: DietaryPreference) => setDietaryPreference(value)}
+                      onValueChange={handleDietaryChange}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select dietary preference" />
@@ -465,35 +568,96 @@ const IngredientsPage = () => {
                       <SelectContent>
                         <SelectItem value="none">No restrictions</SelectItem>
                         <SelectItem value="vegetarian">Vegetarian</SelectItem>
-                        <SelectItem value="vegan">Vegan</SelectItem>
-                        <SelectItem value="gluten-free">Gluten-Free</SelectItem>
-                        <SelectItem value="lactose-free">Lactose-Free</SelectItem>
-                        <SelectItem value="high-protein">High-Protein</SelectItem>
-                        <SelectItem value="low-carb">Low-Carb</SelectItem>
-                        <SelectItem value="kosher">Kosher</SelectItem>
-                        <SelectItem value="halal">Halal</SelectItem>
-                        <SelectItem value="atlantic">Atlantic</SelectItem>
-                        <SelectItem value="keto">Keto</SelectItem>
+                        <SelectItem value="vegan">
+                          Vegan
+                          <span className="ml-2 text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">PRO</span>
+                        </SelectItem>
+                        <SelectItem value="gluten-free">
+                          Gluten-Free
+                          <span className="ml-2 text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">PRO</span>
+                        </SelectItem>
+                        <SelectItem value="lactose-free">
+                          Lactose-Free
+                          <span className="ml-2 text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">PRO</span>
+                        </SelectItem>
+                        <SelectItem value="high-protein">
+                          High-Protein
+                          <span className="ml-2 text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">PRO</span>
+                        </SelectItem>
+                        <SelectItem value="low-carb">
+                          Low-Carb
+                          <span className="ml-2 text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">PRO</span>
+                        </SelectItem>
+                        <SelectItem value="kosher">
+                          Kosher
+                          <span className="ml-2 text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">PRO</span>
+                        </SelectItem>
+                        <SelectItem value="halal">
+                          Halal
+                          <span className="ml-2 text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">PRO</span>
+                        </SelectItem>
+                        <SelectItem value="atlantic">
+                          Atlantic
+                          <span className="ml-2 text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">PRO</span>
+                        </SelectItem>
+                        <SelectItem value="keto">
+                          Keto
+                          <span className="ml-2 text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">PRO</span>
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </CardContent>
                 </Card>
                 
                 <Card>
-                  <CardContent className="pt-6">
-                    <h3 className="text-lg font-medium mb-3">Calorie Control</h3>
+                  <CardContent 
+                    className="pt-6 cursor-pointer" 
+                    onClick={() => !isPremiumUser && showPaywall('Calorie control')}
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-lg font-medium">Calorie Control</h3>
+                      <span className="text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">
+                        PRO
+                      </span>
+                    </div>
                     <div className="flex items-center gap-3">
-                      <Input 
-                        type="number" 
-                        placeholder="Max calories per serving"
-                        value={calorieLimit}
-                        onChange={(e) => setCalorieLimit(e.target.value)}
-                      />
-                      <span className="text-sm text-muted-foreground">kcal</span>
+                      <div 
+                        className="flex-1 relative cursor-pointer"
+                        onClick={() => !isPremiumUser && showPaywall('Calorie control')}
+                      >
+                        <Input 
+                          type="number" 
+                          placeholder="Max calories per serving"
+                          value={calorieLimit}
+                          onChange={(e) => handleCalorieChange(e.target.value)}
+                          disabled={!isPremiumUser}
+                          className={`w-full disabled:opacity-50 ${!isPremiumUser ? "pointer-events-none" : ""}`}
+                        />
+                        {!isPremiumUser && (
+                          <div className="absolute inset-0" />
+                        )}
+                      </div>
+                      <span className="text-sm text-muted-foreground whitespace-nowrap">kcal</span>
                     </div>
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Remove the old premium feature notice since we now show inline PRO badges */}
+              {!isPremiumUser && (dietaryPreference && !['none', 'vegetarian'].includes(dietaryPreference) || calorieLimit) && (
+                <div className="mt-4 p-4 bg-muted rounded-lg">
+                  <h3 className="font-semibold mb-2">Premium Features Selected</h3>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Your search will proceed without the premium filters you've selected.
+                  </p>
+                  <Button 
+                    variant="outline"
+                    onClick={() => navigate('/upgrade')}
+                  >
+                    Upgrade to Premium
+                  </Button>
+                </div>
+              )}
             </>
           )}
           
@@ -504,8 +668,8 @@ const IngredientsPage = () => {
               
               <IngredientBasedRecommendations 
                 ingredients={getSelectedIngredientNames()}
-                dietaryFilter={dietaryPreference}
-                calorieLimit={calorieLimit ? parseInt(calorieLimit) : undefined}
+                dietaryFilter={isPremiumUser ? dietaryPreference : ''}
+                calorieLimit={isPremiumUser ? parseInt(calorieLimit) : undefined}
                 onSelectRecipe={handleSelectRecipe}
               />
               
@@ -528,7 +692,7 @@ const IngredientsPage = () => {
           <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t md:relative md:border-0 md:p-0 md:mt-8">
             <div className="container max-w-4xl mx-auto md:flex md:justify-center">
               <Button 
-                onClick={handleGenerateRecipe}
+                onClick={handleFindRecipes}
                 className="w-full gap-2 md:w-auto"
                 disabled={isGeneratingRecipe}
               >
@@ -548,6 +712,20 @@ const IngredientsPage = () => {
           </div>
         )}
       </div>
+
+      {user ? (
+        <PaywallModal 
+          isOpen={paywallOpen}
+          onClose={() => setPaywallOpen(false)}
+          feature={paywallFeature}
+        />
+      ) : (
+        <AuthModal 
+          isOpen={authModalOpen}
+          onClose={() => setAuthModalOpen(false)}
+          feature={paywallFeature}
+        />
+      )}
     </Layout>
   );
 };

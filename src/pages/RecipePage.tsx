@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { ArrowLeft, Printer, Share2, Info, Play, Video, Circle, Loader2, Plus, Wand2, Minus } from 'lucide-react';
+import { ArrowLeft, Printer, Share2, Info, Play, Video, Circle, Loader2, Plus, Wand2, Minus, Bookmark } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
@@ -12,6 +12,12 @@ import IngredientCategoryIcon from '@/components/IngredientCategoryIcon';
 import type { Recipe } from '@/types/recipe';
 import Layout from '@/components/Layout';
 import Fraction from 'fraction.js';
+import { canUsePremiumFeature } from '@/services/usageService';
+import PaywallModal from '@/components/PaywallModal';
+import { saveRecipe, unsaveRecipe, isRecipeSaved } from '@/services/recipeService';
+import { useAuthStore } from '@/services/firebaseService';
+import AuthModal from '@/components/AuthModal';
+import { cn } from '@/lib/utils';
 
 const RecipePage = () => {
   const navigate = useNavigate();
@@ -24,6 +30,12 @@ const RecipePage = () => {
   const [scaleMultiplier, setScaleMultiplier] = useState(1);
   const [baseServings, setBaseServings] = useState<number>(1);
   const [recipe, setRecipe] = useState<Recipe | null>(null);
+  const [paywallOpen, setPaywallOpen] = useState(false);
+  const [paywallFeature, setPaywallFeature] = useState<string>('');
+  const [isSaved, setIsSaved] = useState<boolean>(false);
+  const [isCheckingSaved, setIsCheckingSaved] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const { user } = useAuthStore();
   
   // The current recipe to display
   const currentRecipe = recipes[0];
@@ -45,50 +57,76 @@ const RecipePage = () => {
       
       // Parse ingredients
       if (parsedRecipes.length > 0 && parsedRecipes[0].ingredients) {
-        const parsedIngredients = parsedRecipes[0].ingredients.map((ingredient: string) => {
-          const match = ingredient.match(/^([\d./\s]+)?\s*([a-zA-Z]+)?\s+(.+)$/);
-          if (match) {
-            const [_, quantity, unit, name] = match;
-            let parsedQuantity = null;
-            if (quantity) {
-              try {
-                // Handle fractions like "1/2" or "1 1/2"
-                const parts = quantity.trim().split(' ');
-                if (parts.length > 1) {
-                  // Mixed number (e.g., "1 1/2")
-                  const whole = parseFloat(parts[0]);
-                  try {
-                    const fraction = new Fraction(parts[1]);
-                    parsedQuantity = whole + fraction.valueOf();
-                  } catch (e) {
-                    parsedQuantity = whole;
-                  }
-                } else if (quantity.includes('/')) {
-                  // Simple fraction (e.g., "1/2")
-                  try {
-                    parsedQuantity = new Fraction(quantity).valueOf();
-                  } catch (e) {
-                    parsedQuantity = parseFloat(quantity) || null;
-                  }
-                } else {
-                  // Simple number
-                  parsedQuantity = parseFloat(quantity);
-                }
-              } catch (e) {
-                console.warn('Failed to parse quantity:', quantity);
-                parsedQuantity = null;
-              }
+        try {
+          console.log('Starting to parse ingredients:', parsedRecipes[0].ingredients);
+          
+          // Handle both string and object formats for ingredients
+          const parsedIngredients = parsedRecipes[0].ingredients.map((ingredient: any) => {
+            // If ingredient is already an object (from saved recipes) return it as is
+            if (typeof ingredient === 'object' && ingredient !== null) {
+              console.log('Ingredient is already an object:', ingredient);
+              return ingredient;
             }
-            return {
-              quantity: parsedQuantity,
-              unit: unit || '',
-              name: name.trim()
-            };
-          }
-          return { quantity: null, unit: '', name: ingredient };
-        });
-        console.log('Parsed ingredients:', parsedIngredients);
-        setIngredients(parsedIngredients);
+            
+            if (typeof ingredient !== 'string') {
+              console.warn('Unexpected ingredient format:', ingredient);
+              return { quantity: null, unit: '', name: String(ingredient) };
+            }
+            
+            // Otherwise parse the string
+            const match = ingredient.match(/^([\d./\s]+)?\s*([a-zA-Z]+)?\s+(.+)$/);
+            if (match) {
+              const [_, quantity, unit, name] = match;
+              let parsedQuantity = null;
+              if (quantity) {
+                try {
+                  // Handle fractions like "1/2" or "1 1/2"
+                  const parts = quantity.trim().split(' ');
+                  if (parts.length > 1) {
+                    // Mixed number (e.g., "1 1/2")
+                    const whole = parseFloat(parts[0]);
+                    try {
+                      const fraction = new Fraction(parts[1]);
+                      parsedQuantity = whole + fraction.valueOf();
+                    } catch (e) {
+                      parsedQuantity = whole;
+                    }
+                  } else if (quantity.includes('/')) {
+                    // Simple fraction (e.g., "1/2")
+                    try {
+                      parsedQuantity = new Fraction(quantity).valueOf();
+                    } catch (e) {
+                      parsedQuantity = parseFloat(quantity) || null;
+                    }
+                  } else {
+                    // Simple number
+                    parsedQuantity = parseFloat(quantity);
+                  }
+                } catch (e) {
+                  console.warn('Failed to parse quantity:', quantity);
+                  parsedQuantity = null;
+                }
+              }
+              return {
+                quantity: parsedQuantity,
+                unit: unit || '',
+                name: name.trim()
+              };
+            }
+            return { quantity: null, unit: '', name: ingredient };
+          });
+          
+          console.log('Parsed ingredients:', parsedIngredients);
+          setIngredients(parsedIngredients);
+        } catch (error) {
+          console.error('Error parsing ingredients:', error);
+          // Fallback to raw ingredients if parsing fails
+          setIngredients(parsedRecipes[0].ingredients.map((ingredient: any) => 
+            typeof ingredient === 'string' 
+              ? { quantity: null, unit: '', name: ingredient }
+              : ingredient
+          ));
+        }
       }
     } else {
       console.log('No recipes found in session storage');
@@ -110,6 +148,25 @@ const RecipePage = () => {
     }
   }, [currentRecipe?.servings, baseServings]);
   
+  // Check if the recipe is saved
+  useEffect(() => {
+    const checkSavedStatus = async () => {
+      if (user && recipes.length > 0) {
+        setIsCheckingSaved(true);
+        try {
+          const saved = await isRecipeSaved(user.uid, String(recipes[0].id));
+          setIsSaved(saved);
+        } catch (error) {
+          console.error('Error checking saved status:', error);
+        } finally {
+          setIsCheckingSaved(false);
+        }
+      }
+    };
+    
+    checkSavedStatus();
+  }, [user, recipes]);
+  
   const handleShare = () => {
     toast({
       title: "Share feature",
@@ -117,7 +174,16 @@ const RecipePage = () => {
     });
   };
   
+  const showPaywall = (feature: string) => {
+    setPaywallFeature(feature);
+    setPaywallOpen(true);
+  };
+
   const handlePrint = () => {
+    if (!canUsePremiumFeature()) {
+      showPaywall('Print shopping lists');
+      return;
+    }
     window.print();
   };
 
@@ -197,10 +263,67 @@ const RecipePage = () => {
   };
   
   const handleServingChange = (increase: boolean) => {
+    if (!canUsePremiumFeature()) {
+      showPaywall('Serving size adjustment');
+      return;
+    }
+    
     if (increase) {
       setBaseServings(prev => prev + 1);
     } else {
       setBaseServings(prev => Math.max(1, prev - 1));
+    }
+  };
+  
+  const handleToggleSave = async () => {
+    if (!user) {
+      setAuthModalOpen(true);
+      return;
+    }
+    
+    if (!recipes.length) return;
+    
+    try {
+      if (isSaved) {
+        // Unsave the recipe
+        const success = await unsaveRecipe(user.uid, String(recipes[0].id));
+        if (success) {
+          setIsSaved(false);
+          toast({
+            title: "Recipe Unsaved",
+            description: "Recipe removed from your saved recipes.",
+          });
+        }
+      } else {
+        // Save the recipe
+        const success = await saveRecipe(user.uid, recipes[0]);
+        if (success) {
+          setIsSaved(true);
+          toast({
+            title: "Recipe Saved",
+            description: "Recipe added to your saved recipes.",
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling save status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update save status. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  const handleAuthModalClose = () => {
+    setAuthModalOpen(false);
+  };
+  
+  const handleLoginSuccess = async () => {
+    setAuthModalOpen(false);
+    if (user && recipes.length > 0) {
+      // Save the recipe after login
+      handleToggleSave();
     }
   };
   
@@ -257,6 +380,28 @@ const RecipePage = () => {
             Back to Ingredients
           </Button>
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost" 
+              size="icon"
+              onClick={handleToggleSave}
+              disabled={isCheckingSaved || loading}
+            >
+              {isSaved ? (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  className="h-4 w-4 text-primary"
+                >
+                  <path fillRule="evenodd" d="M6.32 2.577a49.255 49.255 0 0111.36 0c1.497.174 2.57 1.46 2.57 2.93V21a.75.75 0 01-1.085.67L12 18.089l-7.165 3.583A.75.75 0 013.75 21V5.507c0-1.47 1.073-2.756 2.57-2.93z" clipRule="evenodd" />
+                </svg>
+              ) : (
+                <Bookmark className="h-4 w-4" />
+              )}
+              <span className="sr-only">
+                {isSaved ? "Unsave Recipe" : "Save Recipe"}
+              </span>
+            </Button>
             <Button variant="ghost" size="icon" onClick={handlePrint}>
               <Printer className="h-4 w-4" />
             </Button>
@@ -402,11 +547,18 @@ const RecipePage = () => {
           <Card className="p-4">
             <div className="flex items-center space-x-4">
               <Label>Servings:</Label>
-              <div className="flex items-center space-x-1">
+              <div 
+                className="flex items-center space-x-1 cursor-pointer" 
+                onClick={() => !canUsePremiumFeature() && showPaywall('Serving size adjustment')}
+              >
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={() => handleServingChange(false)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleServingChange(false);
+                  }}
+                  disabled={!canUsePremiumFeature()}
                 >
                   <Minus className="h-4 w-4" />
                 </Button>
@@ -416,10 +568,19 @@ const RecipePage = () => {
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={() => handleServingChange(true)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleServingChange(true);
+                  }}
+                  disabled={!canUsePremiumFeature()}
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
+                {!canUsePremiumFeature() && (
+                  <span className="ml-2 text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">
+                    PRO
+                  </span>
+                )}
               </div>
             </div>
           </Card>
@@ -467,24 +628,36 @@ const RecipePage = () => {
           </div>
           
           <div className="space-y-6">
-            {currentRecipe.instructions.map((instruction, index) => (
-              <div key={index} className="flex gap-4">
-                <div className="flex-none">
-                  {imageMode ? (
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold">
-                      <Play size={16} />
-                    </div>
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold">
-                      {index + 1}
-                    </div>
-                  )}
+            {currentRecipe.instructions && currentRecipe.instructions.length > 0 ? (
+              currentRecipe.instructions.map((instruction, index) => (
+                <div key={index} className="flex gap-4">
+                  <div className="flex-none">
+                    {imageMode ? (
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold">
+                        <Play size={16} />
+                      </div>
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold">
+                        {index + 1}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 pt-1">
+                    <p>{instruction}</p>
+                  </div>
                 </div>
-                <div className="flex-1 pt-1">
-                  <p>{instruction}</p>
+              ))
+            ) : (
+              <Card className="p-6">
+                <div className="text-center space-y-2">
+                  <Info className="h-8 w-8 mx-auto text-muted-foreground opacity-50" />
+                  <p className="text-muted-foreground">No instructions available for this recipe.</p>
+                  <p className="text-xs text-muted-foreground">
+                    This may be a recipe you saved previously. You can still view the ingredients and other details.
+                  </p>
                 </div>
-              </div>
-            ))}
+              </Card>
+            )}
           </div>
         </div>
         
@@ -500,6 +673,19 @@ const RecipePage = () => {
           </Button>
         </div>
       </div>
+
+      <PaywallModal 
+        isOpen={paywallOpen}
+        onClose={() => setPaywallOpen(false)}
+        feature={paywallFeature}
+      />
+      
+      <AuthModal 
+        isOpen={authModalOpen}
+        onClose={handleAuthModalClose}
+        onLoginSuccess={handleLoginSuccess}
+        feature="save recipes"
+      />
     </Layout>
   );
 };

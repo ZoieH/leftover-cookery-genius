@@ -1,0 +1,40 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow read access to all recipes for any user
+    match /recipes/{recipeId} {
+      allow read: if true;
+      
+      // Only allow write if the user is authenticated (you can modify this if needed)
+      // For now, since your app doesn't have authentication yet, we'll allow all writes
+      // THIS IS FOR DEVELOPMENT ONLY - restrict this before production!
+      allow write: if true;
+    }
+    
+    // For future use - restrict admin functionality
+    match /admin/{document=**} {
+      // Only allow access if user has admin role (implement this later when you add auth)
+      allow read, write: if true;  // For development only
+    }
+    
+    // User permissions - allow users to manage their own documents and premium status
+    match /users/{userId} {
+      // Allow users to read and write their own documents
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // For development purposes, also allow any authenticated user to read/write
+      // REMOVE THIS FOR PRODUCTION - only keep the rule above
+      allow read, write: if request.auth != null;
+    }
+    
+    // Allow authenticated users to create/update users collection documents
+    match /users/{document=**} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+} 

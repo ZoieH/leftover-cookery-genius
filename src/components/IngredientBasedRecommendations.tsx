@@ -2,14 +2,16 @@ import React, { useState, useEffect, FC } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { Loader2, Search, Plus, Clock, User } from 'lucide-react';
+import { Loader2, Search, Plus, Clock, User, Bookmark } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { recommendRecipesFromIngredients } from '../services/recipeRecommendationService';
 import { calculateIngredientCoverage, findMissingIngredients } from '../utils/recipeUtils';
+import { saveRecipe, unsaveRecipe, isRecipeSaved } from '../services/recipeService';
 import type { Recipe } from '@/types/recipe';
 import { cn } from '@/lib/utils';
 import { SpoonacularError } from '../services/spoonacularService';
-import { toast } from '@/components/ui/use-toast';
+import { useAuthStore } from '@/services/firebaseService';
+import AuthModal from '@/components/AuthModal';
 
 interface IngredientBasedRecommendationsProps {
   ingredients: string[];
@@ -47,6 +49,11 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
   const [alternativeRecipes, setAlternativeRecipes] = useState<Recipe[]>([]);
   const [expandedRecipeId, setExpandedRecipeId] = useState<Recipe['id']>(null);
   const [useCache, setUseCache] = useState(true);
+  const [savedRecipes, setSavedRecipes] = useState<Record<string, boolean>>({});
+  const [isCheckingSaved, setIsCheckingSaved] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [recipeToSave, setRecipeToSave] = useState<Recipe | null>(null);
+  const { user } = useAuthStore();
   const { toast } = useToast();
 
   // Function to truncate description
@@ -190,6 +197,96 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
     loadRecommendations(true, true);
   };
 
+  // Check which recipes are saved by the user
+  const checkSavedRecipes = async () => {
+    if (!user) return;
+    
+    setIsCheckingSaved(true);
+    try {
+      const allRecipes = [...recommendations, ...alternativeRecipes];
+      const savedStatus: Record<string, boolean> = {};
+      
+      // Check each recipe in parallel
+      await Promise.all(allRecipes.map(async (recipe) => {
+        const isSaved = await isRecipeSaved(user.uid, String(recipe.id));
+        savedStatus[String(recipe.id)] = isSaved;
+      }));
+      
+      setSavedRecipes(savedStatus);
+    } catch (error) {
+      console.error('Error checking saved recipes:', error);
+    } finally {
+      setIsCheckingSaved(false);
+    }
+  };
+  
+  // Handle saving a recipe
+  const handleToggleSave = async (recipe: Recipe) => {
+    if (!user) {
+      // Show auth modal if user is not logged in
+      setRecipeToSave(recipe);
+      setAuthModalOpen(true);
+      return;
+    }
+    
+    const recipeId = String(recipe.id);
+    const isCurrentlySaved = savedRecipes[recipeId];
+    
+    try {
+      if (isCurrentlySaved) {
+        // Unsave the recipe
+        const success = await unsaveRecipe(user.uid, recipeId);
+        if (success) {
+          setSavedRecipes(prev => ({
+            ...prev,
+            [recipeId]: false
+          }));
+          toast({
+            title: "Recipe Unsaved",
+            description: "Recipe removed from your saved recipes.",
+          });
+        }
+      } else {
+        // Save the recipe
+        const success = await saveRecipe(user.uid, recipe);
+        if (success) {
+          setSavedRecipes(prev => ({
+            ...prev,
+            [recipeId]: true
+          }));
+          toast({
+            title: "Recipe Saved",
+            description: "Recipe added to your saved recipes.",
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling save status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update save status. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  // Handle auth modal close
+  const handleAuthModalClose = () => {
+    setAuthModalOpen(false);
+    setRecipeToSave(null);
+  };
+  
+  // Handle login success
+  const handleLoginSuccess = async () => {
+    setAuthModalOpen(false);
+    
+    // If there was a recipe waiting to be saved, save it
+    if (recipeToSave && user) {
+      await handleToggleSave(recipeToSave);
+      setRecipeToSave(null);
+    }
+  };
+
   useEffect(() => {
     if (ingredients.length > 0) {
       loadRecommendations(false);
@@ -197,6 +294,13 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
       setRecommendations([]);
     }
   }, [ingredients, dietaryFilter]);
+  
+  // Check saved recipes when user or recipes change
+  useEffect(() => {
+    if (user && (recommendations.length > 0 || alternativeRecipes.length > 0)) {
+      checkSavedRecipes();
+    }
+  }, [user, recommendations, alternativeRecipes]);
 
   const toggleRecipeExpansion = (recipeId: string) => {
     setExpandedRecipeId(expandedRecipeId === recipeId ? null : recipeId);
@@ -254,10 +358,10 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
                       "transition-all duration-200",
                       isExpanded && "ring-2 ring-primary"
                     )}>
-                      <CardHeader>
-                        <div className="flex justify-between items-start gap-4">
+                      <CardHeader className="p-4 sm:p-6">
+                        <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                           {recipe.image && (
-                            <div className="flex-shrink-0 w-24 h-24 rounded-md overflow-hidden">
+                            <div className="flex-shrink-0 w-full sm:w-24 h-40 sm:h-24 rounded-md overflow-hidden mb-3 sm:mb-0">
                               <img 
                                 src={recipe.image}
                                 alt={recipe.title}
@@ -269,15 +373,16 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
                               />
                             </div>
                           )}
-                          <div className="flex-1">
-                            <CardTitle>{recipe.title}</CardTitle>
-                            <CardDescription className="mt-1">
+                          <div className="flex-1 space-y-1">
+                            <CardTitle className="text-xl sm:text-2xl">{recipe.title}</CardTitle>
+                            <CardDescription className="mt-1 text-sm">
                               {isExpanded ? recipe.description : truncateDescription(recipe.description)}
                             </CardDescription>
                           </div>
                           <Button
                             variant="ghost"
                             size="sm"
+                            className="self-start mt-2 sm:mt-0"
                             onClick={() => toggleRecipeExpansion(String(recipe.id))}
                           >
                             {isExpanded ? "Show Less" : "Show More"}
@@ -286,7 +391,7 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
                       </CardHeader>
                       
                       {isExpanded && (
-                        <CardContent>
+                        <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
                           <div className="space-y-4">
                             <div className="flex flex-wrap gap-2">
                               {recipe.dietaryTags.map((tag) => (
@@ -296,13 +401,13 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
                               ))}
                             </div>
                             
-                            <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                               <div className="flex items-center gap-2">
-                                <Clock className="h-4 w-4 text-muted-foreground" />
+                                <Clock className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
                                 <span>{recipe.prepTime} + {recipe.cookTime}</span>
                               </div>
                               <div className="flex items-center gap-2">
-                                <User className="h-4 w-4 text-muted-foreground" />
+                                <User className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
                                 <span>Serves {recipe.servings}</span>
                               </div>
                             </div>
@@ -321,9 +426,9 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
                         </CardContent>
                       )}
                       
-                      <CardFooter className="flex justify-between">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline">
+                      <CardFooter className="p-4 sm:p-6 flex flex-col sm:flex-row sm:justify-between gap-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline" className="whitespace-nowrap">
                             {Math.round(coverage * 100)}% Match
                           </Badge>
                           {coverage < 1 && (
@@ -332,14 +437,40 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
                             </span>
                           )}
                         </div>
-                        {onSelectRecipe && (
+                        <div className="flex items-center gap-2">
                           <Button
-                            size="sm"
-                            onClick={() => onSelectRecipe(recipe)}
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleToggleSave(recipe)}
+                            disabled={isCheckingSaved}
                           >
-                            Select Recipe
+                            {savedRecipes[String(recipe.id)] ? (
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                fill="currentColor"
+                                className="h-4 w-4 text-primary"
+                              >
+                                <path fillRule="evenodd" d="M6.32 2.577a49.255 49.255 0 0111.36 0c1.497.174 2.57 1.46 2.57 2.93V21a.75.75 0 01-1.085.67L12 18.089l-7.165 3.583A.75.75 0 013.75 21V5.507c0-1.47 1.073-2.756 2.57-2.93z" clipRule="evenodd" />
+                              </svg>
+                            ) : (
+                              <Bookmark className="h-4 w-4" />
+                            )}
+                            <span className="sr-only">
+                              {savedRecipes[String(recipe.id)] ? "Unsave Recipe" : "Save Recipe"}
+                            </span>
                           </Button>
-                        )}
+                          {onSelectRecipe && (
+                            <Button
+                              size="sm"
+                              className="w-full sm:w-auto"
+                              onClick={() => onSelectRecipe(recipe)}
+                            >
+                              Select Recipe
+                            </Button>
+                          )}
+                        </div>
                       </CardFooter>
                     </Card>
                   );
@@ -359,10 +490,10 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
                 "transition-all duration-200",
                 isExpanded && "ring-2 ring-primary"
               )}>
-                <CardHeader>
-                  <div className="flex justify-between items-start gap-4">
+                <CardHeader className="p-4 sm:p-6">
+                  <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                     {recipe.image && (
-                      <div className="flex-shrink-0 w-24 h-24 rounded-md overflow-hidden">
+                      <div className="flex-shrink-0 w-full sm:w-24 h-40 sm:h-24 rounded-md overflow-hidden mb-3 sm:mb-0">
                         <img 
                           src={recipe.image}
                           alt={recipe.title}
@@ -374,15 +505,16 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
                         />
                       </div>
                     )}
-                    <div className="flex-1">
-                      <CardTitle>{recipe.title}</CardTitle>
-                      <CardDescription className="mt-1">
+                    <div className="flex-1 space-y-1">
+                      <CardTitle className="text-xl sm:text-2xl">{recipe.title}</CardTitle>
+                      <CardDescription className="mt-1 text-sm">
                         {isExpanded ? recipe.description : truncateDescription(recipe.description)}
                       </CardDescription>
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
+                      className="self-start mt-2 sm:mt-0"
                       onClick={() => toggleRecipeExpansion(String(recipe.id))}
                     >
                       {isExpanded ? "Show Less" : "Show More"}
@@ -391,7 +523,7 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
                 </CardHeader>
                 
                 {isExpanded && (
-                  <CardContent>
+                  <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
                     <div className="space-y-4">
                       <div className="flex flex-wrap gap-2">
                         {recipe.dietaryTags.map((tag) => (
@@ -401,13 +533,13 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
                         ))}
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                         <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-muted-foreground" />
+                          <Clock className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
                           <span>{recipe.prepTime} + {recipe.cookTime}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-muted-foreground" />
+                          <User className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
                           <span>Serves {recipe.servings}</span>
                         </div>
                       </div>
@@ -426,9 +558,9 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
                   </CardContent>
                 )}
                 
-                <CardFooter className="flex justify-between">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline">
+                <CardFooter className="p-4 sm:p-6 flex flex-col sm:flex-row sm:justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline" className="whitespace-nowrap">
                       {Math.round(coverage * 100)}% Match
                     </Badge>
                     {coverage < 1 && (
@@ -437,20 +569,52 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
                       </span>
                     )}
                   </div>
-                  {onSelectRecipe && (
+                  <div className="flex items-center gap-2">
                     <Button
-                      size="sm"
-                      onClick={() => onSelectRecipe(recipe)}
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => handleToggleSave(recipe)}
+                      disabled={isCheckingSaved}
                     >
-                      Select Recipe
+                      {savedRecipes[String(recipe.id)] ? (
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                          className="h-4 w-4 text-primary"
+                        >
+                          <path fillRule="evenodd" d="M6.32 2.577a49.255 49.255 0 0111.36 0c1.497.174 2.57 1.46 2.57 2.93V21a.75.75 0 01-1.085.67L12 18.089l-7.165 3.583A.75.75 0 013.75 21V5.507c0-1.47 1.073-2.756 2.57-2.93z" clipRule="evenodd" />
+                        </svg>
+                      ) : (
+                        <Bookmark className="h-4 w-4" />
+                      )}
+                      <span className="sr-only">
+                        {savedRecipes[String(recipe.id)] ? "Unsave Recipe" : "Save Recipe"}
+                      </span>
                     </Button>
-                  )}
+                    {onSelectRecipe && (
+                      <Button
+                        size="sm"
+                        className="w-full sm:w-auto"
+                        onClick={() => onSelectRecipe(recipe)}
+                      >
+                        Select Recipe
+                      </Button>
+                    )}
+                  </div>
                 </CardFooter>
               </Card>
             );
           })}
         </div>
       )}
+      <AuthModal 
+        isOpen={authModalOpen}
+        onClose={handleAuthModalClose}
+        onLoginSuccess={handleLoginSuccess}
+        feature="save recipes"
+      />
     </div>
   );
 };
