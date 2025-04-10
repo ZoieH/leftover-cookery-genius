@@ -119,29 +119,52 @@ export const createCheckoutSession = async (userId: string, email: string) => {
   try {
     console.log('Creating checkout session for user:', userId, email);
     
-    // Store the current page URL to redirect back after payment
-    const returnUrl = encodeURIComponent(window.location.pathname);
-    
-    // Direct Stripe Checkout approach (simpler)
-    const stripe = await stripePromise;
-    
-    if (!stripe) {
-      throw new Error('Stripe failed to initialize');
-    }
-    
-    // Create a checkout session directly with Stripe
-    const { error } = await stripe.redirectToCheckout({
-      lineItems: [{ price: import.meta.env.VITE_STRIPE_PREMIUM_PRICE_ID, quantity: 1 }],
-      mode: 'subscription',
-      // Include return URL in the success redirect
-      successUrl: `${window.location.origin}/payment-success?user=${userId}&returnUrl=${returnUrl}`,
-      cancelUrl: `${window.location.origin}/payment-canceled?returnUrl=${returnUrl}`,
-      customerEmail: email,
-    });
-    
-    if (error) {
-      console.error('Stripe redirect error:', error);
-      throw error;
+    // API approach - call our server to create a checkout session
+    try {
+      const response = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          email,
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create checkout session');
+      }
+      
+      const { url } = await response.json();
+      
+      // Redirect to checkout
+      window.location.href = url;
+    } catch (apiError) {
+      console.error('Server-side checkout failed, falling back to client-side:', apiError);
+      
+      // Fallback to client-side if server fails
+      const stripe = await stripePromise;
+      
+      if (!stripe) {
+        throw new Error('Stripe failed to initialize');
+      }
+      
+      // Create a checkout session directly with Stripe
+      const { error: stripeError } = await stripe.redirectToCheckout({
+        lineItems: [{ price: import.meta.env.VITE_STRIPE_PREMIUM_PRICE_ID, quantity: 1 }],
+        mode: 'subscription',
+        // Use simple success/cancel URLs to avoid SPA routing issues
+        successUrl: `${window.location.origin}/payment-success?user=${userId}`,
+        cancelUrl: `${window.location.origin}/payment-canceled`,
+        customerEmail: email,
+      });
+      
+      if (stripeError) {
+        console.error('Stripe redirect error:', stripeError);
+        throw stripeError;
+      }
     }
   } catch (error) {
     console.error('Error creating checkout session:', error);

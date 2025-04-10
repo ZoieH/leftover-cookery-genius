@@ -21,8 +21,8 @@ const PaymentSuccessPage = () => {
         // Get the user ID from URL parameters
         const params = new URLSearchParams(location.search);
         const userId = params.get('user');
-        const returnUrl = params.get('returnUrl');
-        const decodedReturnUrl = returnUrl ? decodeURIComponent(returnUrl) : '/';
+        
+        console.log('Processing payment success for user:', userId);
 
         if (!userId) {
           toast({
@@ -52,7 +52,7 @@ const PaymentSuccessPage = () => {
         
         // Auto-redirect after 3 seconds
         setTimeout(() => {
-          navigate(decodedReturnUrl);
+          navigate('/');
         }, 3000);
       } catch (error: any) {
         console.error('Error processing payment:', error);
@@ -94,10 +94,7 @@ const PaymentSuccessPage = () => {
               </p>
               <Button 
                 onClick={() => {
-                  const params = new URLSearchParams(location.search);
-                  const returnUrl = params.get('returnUrl');
-                  const decodedReturnUrl = returnUrl ? decodeURIComponent(returnUrl) : '/';
-                  navigate(decodedReturnUrl);
+                  navigate('/');
                 }} 
                 className="w-full"
               >

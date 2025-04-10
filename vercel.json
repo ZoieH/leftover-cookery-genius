@@ -15,29 +15,8 @@
   ],
   "routes": [
     {
-      "src": "/api/webhook",
-      "dest": "server/index.js"
-    },
-    {
-      "src": "/api/create-checkout-session",
-      "dest": "server/index.js"
-    },
-    {
       "src": "/api/(.*)",
       "dest": "server/index.js"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/dist/$1",
-      "continue": true
-    },
-    {
-      "src": "/payment-success",
-      "dest": "/dist/index.html"
-    },
-    {
-      "src": "/payment-canceled",
-      "dest": "/dist/index.html"
     },
     {
       "handle": "filesystem"

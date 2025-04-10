@@ -31,7 +31,9 @@ app.use((req, res, next) => {
 
 // For Stripe webhook - must come before express.json() middleware
 app.post('/api/webhook', async (req, res) => {
+  console.log('Webhook received');
   const sig = req.headers['stripe-signature'];
+  console.log('Signature:', sig ? 'Present' : 'Missing');
 
   try {
     const event = stripe.webhooks.constructEvent(
@@ -39,6 +41,8 @@ app.post('/api/webhook', async (req, res) => {
       sig,
       process.env.STRIPE_WEBHOOK_SECRET
     );
+
+    console.log('Webhook verified, event type:', event.type);
 
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
@@ -81,7 +85,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
         },
       ],
       mode: 'subscription',
-      success_url: `${process.env.FRONTEND_URL}/payment-success?user=${userId}&session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${process.env.FRONTEND_URL}/payment-success?user=${userId}`,
       cancel_url: `${process.env.FRONTEND_URL}/payment-canceled`,
       customer_email: email,
       client_reference_id: userId,
