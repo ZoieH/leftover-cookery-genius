@@ -78,6 +78,12 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
         try {
           // Get fresh results from API
           allRecipes = await recommendRecipesFromIngredients(ingredients, dietaryFilter, { threshold: 0.1 });
+          // Log recipe sources
+          console.log('Recipe sources:', allRecipes.map(recipe => ({
+            title: recipe.title,
+            source: recipe.source,
+            id: recipe.id
+          })));
           // Cache the results
           if (useCache) {
             sessionStorage.setItem(cacheKey, JSON.stringify(allRecipes));
@@ -139,20 +145,6 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
       setAlternativeRecipes([]);
     } finally {
       setIsLoading(false);
-    }
-
-    if (recommendations.length === 0) {
-      if (ingredients.length === 0) {
-        toast({
-          description: 'Please add some ingredients first.',
-          variant: 'default',
-        });
-      } else {
-        toast({
-          description: 'No recipes found with your ingredients.',
-          variant: 'default',
-        });
-      }
     }
   };
 

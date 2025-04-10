@@ -1,13 +1,12 @@
 import { Recipe } from '@/types/recipe';
 import { searchSpoonacularRecipes } from './spoonacularService';
 import { searchRecipes } from './recipeService';
+import { generateRecipeWithOpenAI } from './openaiService';
 import { calculateIngredientCoverage } from '../utils/recipeUtils';
 
 export interface RecommendationOptions {
   threshold?: number;
   maxResults?: number;
-  useLocalRecipes?: boolean;
-  useSpoonacular?: boolean;
 }
 
 /**
@@ -25,11 +24,10 @@ function countMatchingIngredients(recipe: Recipe, userIngredients: string[]): nu
 }
 
 /**
- * Recommends recipes based on available ingredients
- * @param ingredients List of ingredients the user has
- * @param dietaryFilter Optional dietary preference
- * @param options Additional options for the recommendation
- * @returns Promise with array of recommended recipes
+ * Recommends recipes based on available ingredients using a three-layer approach:
+ * 1. First searches our own database
+ * 2. If no matches, tries Spoonacular API
+ * 3. If still no matches, generates a recipe using OpenAI
  */
 export const recommendRecipesFromIngredients = async (
   ingredients: string[],
@@ -38,47 +36,19 @@ export const recommendRecipesFromIngredients = async (
 ): Promise<Recipe[]> => {
   const {
     threshold = 0.2,
-    maxResults = 10,
-    useLocalRecipes = true,
-    useSpoonacular = false // Changed default to false due to API limits
+    maxResults = 10
   } = options;
 
   try {
-    const allRecipes: Recipe[] = [];
+    // Layer 1: Search our own database
+    const localRecipes = await searchRecipes({
+      ingredients,
+      dietaryPreference: dietaryFilter,
+      maxResults: maxResults
+    });
 
-    // Get local recipes if enabled
-    if (useLocalRecipes) {
-      const localRecipes = await searchRecipes({
-        ingredients,
-        dietaryPreference: dietaryFilter,
-        maxResults: maxResults
-      });
-      allRecipes.push(...localRecipes);
-    }
-
-    // Try Spoonacular recipes if enabled, but handle failures gracefully
-    if (useSpoonacular) {
-      try {
-        const spoonacularRecipes = await searchSpoonacularRecipes(ingredients, dietaryFilter);
-        allRecipes.push(...spoonacularRecipes);
-      } catch (error) {
-        console.warn('Spoonacular API error, falling back to local recipes:', error);
-        // Don't throw error, just continue with local recipes
-      }
-    }
-
-    // If no recipes found at all, try local recipes as fallback even if not enabled
-    if (allRecipes.length === 0 && !useLocalRecipes) {
-      const fallbackRecipes = await searchRecipes({
-        ingredients,
-        dietaryPreference: dietaryFilter,
-        maxResults: maxResults
-      });
-      allRecipes.push(...fallbackRecipes);
-    }
-
-    // Filter and sort all recipes
-    const filteredRecipes = allRecipes
+    // Filter and sort local recipes
+    const filteredLocalRecipes = localRecipes
       .filter(recipe => {
         const coverage = calculateIngredientCoverage(recipe, ingredients);
         const hasAtLeastOneMatch = countMatchingIngredients(recipe, ingredients) > 0;
@@ -88,18 +58,55 @@ export const recommendRecipesFromIngredients = async (
         const coverageA = calculateIngredientCoverage(a, ingredients);
         const coverageB = calculateIngredientCoverage(b, ingredients);
         return coverageB - coverageA;
-      })
-      .slice(0, maxResults);
-
-    // If still no recipes found after filtering, lower the threshold and try again
-    if (filteredRecipes.length === 0 && threshold > 0.1) {
-      return recommendRecipesFromIngredients(ingredients, dietaryFilter, {
-        ...options,
-        threshold: threshold / 2
       });
+
+    if (filteredLocalRecipes.length > 0) {
+      return filteredLocalRecipes.slice(0, maxResults);
     }
 
-    return filteredRecipes;
+    // Layer 2: Try Spoonacular API
+    try {
+      console.log('Attempting to fetch recipes from Spoonacular...');
+      const spoonacularRecipes = await searchSpoonacularRecipes(ingredients, dietaryFilter);
+      console.log('Spoonacular recipes received:', spoonacularRecipes.length);
+      
+      const filteredSpoonacularRecipes = spoonacularRecipes
+        .filter(recipe => {
+          const coverage = calculateIngredientCoverage(recipe, ingredients);
+          const hasAtLeastOneMatch = countMatchingIngredients(recipe, ingredients) > 0;
+          return coverage >= threshold && hasAtLeastOneMatch;
+        })
+        .sort((a, b) => {
+          const coverageA = calculateIngredientCoverage(a, ingredients);
+          const coverageB = calculateIngredientCoverage(b, ingredients);
+          return coverageB - coverageA;
+        });
+
+      if (filteredSpoonacularRecipes.length > 0) {
+        return filteredSpoonacularRecipes.slice(0, maxResults);
+      }
+      console.log('No matching Spoonacular recipes found, trying ChatGPT...');
+    } catch (error) {
+      console.warn('Spoonacular API error:', error);
+      console.log('Spoonacular API failed, falling back to ChatGPT...');
+    }
+
+    // Layer 3: Generate recipe using OpenAI
+    try {
+      console.log('Attempting to generate recipe with ChatGPT...');
+      const aiRecipe = await generateRecipeWithOpenAI(ingredients, dietaryFilter);
+      if (aiRecipe) {
+        console.log('Successfully generated recipe with ChatGPT');
+        return [aiRecipe];
+      }
+      console.error('ChatGPT failed to generate a recipe');
+    } catch (error) {
+      console.error('Error generating recipe with ChatGPT:', error);
+    }
+
+    // If all layers fail, return empty array
+    console.log('All recipe sources failed, returning empty array');
+    return [];
 
   } catch (error) {
     console.error('Error recommending recipes:', error);
