@@ -35,9 +35,30 @@ const app = express();
 
 // Middleware for CORS
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3002', 'http://localhost:5173', process.env.FRONTEND_URL],
+  origin: process.env.NODE_ENV === 'production' 
+    ? [process.env.FRONTEND_URL] 
+    : ['http://localhost:3000', 'http://localhost:3002', 'http://localhost:5173', process.env.FRONTEND_URL],
   credentials: true
 }));
+
+// Add security headers for production
+if (process.env.NODE_ENV === 'production') {
+  app.use((req, res, next) => {
+    // Protect against clickjacking
+    res.setHeader('X-Frame-Options', 'DENY');
+    // Help protect against XSS
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    // Help protect against sniff attacks
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    // Strict transport security
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+    // Prevent loading in an iframe
+    res.setHeader('Content-Security-Policy', "frame-ancestors 'none'");
+    // Enable referrer policy
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    next();
+  });
+}
 
 // Special handling for Stripe webhooks
 app.use((req, res, next) => {
@@ -50,9 +71,15 @@ app.use((req, res, next) => {
 
 // For Stripe webhook - must come before express.json() middleware
 app.post('/api/webhook', async (req, res) => {
-  console.log('Webhook received');
   const sig = req.headers['stripe-signature'];
-  console.log('Signature:', sig ? 'Present' : 'Missing');
+  
+  // Production logging should be minimal
+  console.log('Webhook received');
+  
+  if (!sig) {
+    console.error('Webhook Error: No signature header');
+    return res.status(400).send('Webhook Error: No signature header');
+  }
 
   try {
     const event = stripe.webhooks.constructEvent(
@@ -61,64 +88,164 @@ app.post('/api/webhook', async (req, res) => {
       process.env.STRIPE_WEBHOOK_SECRET
     );
 
-    console.log('Webhook verified, event type:', event.type);
-
-    if (event.type === 'checkout.session.completed') {
-      const session = event.data.object;
-      // Handle successful payment
-      const userId = session.client_reference_id || (session.metadata && session.metadata.userId);
-      console.log('Payment successful for user:', userId);
-      
-      if (userId) {
-        try {
-          // Update user's premium status in Firestore using Firebase Admin SDK
-          const db = admin.firestore();
-          const premiumData = {
-            isPremium: true,
-            premiumSince: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            subscriptionId: session.subscription,
-            stripeCustomerId: session.customer,
-            subscriptionStatus: 'active'
-          };
-          
-          // Update Firestore using document ID as userId
-          await db.collection('users').doc(userId).set(premiumData, { merge: true });
-          
-          console.log('Successfully updated premium status for user:', userId);
-        } catch (updateError) {
-          console.error('Error updating user premium status:', updateError);
-          // We don't want to fail the webhook if this fails
-        }
-      } else {
-        console.error('User ID missing in session:', session);
-      }
+    // Handle each event type appropriately
+    switch (event.type) {
+      case 'checkout.session.completed':
+        await handleCheckoutSessionCompleted(event.data.object);
+        break;
+      case 'customer.subscription.updated':
+        await handleSubscriptionUpdated(event.data.object);
+        break;
+      case 'customer.subscription.deleted':
+        await handleSubscriptionCancelled(event.data.object);
+        break;
+      // Handle more event types as needed
+      default:
+        // For unhandled events, just log their type
+        console.log(`Unhandled event type: ${event.type}`);
     }
 
     res.json({ received: true });
   } catch (error) {
-    console.error('Webhook error:', error);
-    res.status(400).send(`Webhook Error: ${error.message}`);
+    console.error('Webhook error:', error.message);
+    return res.status(400).send(`Webhook Error: ${error.message}`);
   }
 });
+
+// Extracted webhook event handlers
+async function handleCheckoutSessionCompleted(session) {
+  const userId = session.client_reference_id || (session.metadata && session.metadata.userId);
+  console.log('Payment successful for user:', userId);
+  
+  if (!userId) {
+    console.error('User ID missing in session:', session.id);
+    return;
+  }
+  
+  try {
+    // Update user's premium status in Firestore using Firebase Admin SDK
+    const db = admin.firestore();
+    const premiumData = {
+      isPremium: true,
+      premiumSince: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      subscriptionId: session.subscription,
+      stripeCustomerId: session.customer,
+      subscriptionStatus: 'active'
+    };
+    
+    // Update Firestore using document ID as userId
+    await db.collection('users').doc(userId).set(premiumData, { merge: true });
+    
+    console.log('Successfully updated premium status for user:', userId);
+  } catch (updateError) {
+    console.error('Error updating user premium status:', updateError);
+    // In production, consider sending alerts for critical failures
+  }
+}
+
+async function handleSubscriptionUpdated(subscription) {
+  try {
+    // Find the user with this subscription ID
+    const db = admin.firestore();
+    const usersRef = db.collection('users');
+    const snapshot = await usersRef.where('subscriptionId', '==', subscription.id).get();
+    
+    if (snapshot.empty) {
+      console.log('No user found with subscription ID:', subscription.id);
+      return;
+    }
+    
+    // Update subscription status
+    const userDoc = snapshot.docs[0];
+    await userDoc.ref.update({
+      subscriptionStatus: subscription.status,
+      updatedAt: new Date().toISOString()
+    });
+    
+    console.log('Updated subscription status for user:', userDoc.id);
+  } catch (error) {
+    console.error('Error handling subscription update:', error);
+  }
+}
+
+async function handleSubscriptionCancelled(subscription) {
+  try {
+    // Find the user with this subscription ID
+    const db = admin.firestore();
+    const usersRef = db.collection('users');
+    const snapshot = await usersRef.where('subscriptionId', '==', subscription.id).get();
+    
+    if (snapshot.empty) {
+      console.log('No user found with subscription ID:', subscription.id);
+      return;
+    }
+    
+    // Update user document
+    const userDoc = snapshot.docs[0];
+    await userDoc.ref.update({
+      subscriptionStatus: 'canceled',
+      isPremium: subscription.cancel_at_period_end ? true : false, // Keep premium until period end
+      cancelAt: subscription.cancel_at ? new Date(subscription.cancel_at * 1000).toISOString() : null,
+      updatedAt: new Date().toISOString()
+    });
+    
+    console.log('Updated subscription cancellation for user:', userDoc.id);
+  } catch (error) {
+    console.error('Error handling subscription cancellation:', error);
+  }
+}
 
 // Create checkout session endpoint
 app.post('/api/create-checkout-session', async (req, res) => {
   try {
-    console.log('Received request for checkout session:', req.body);
+    // Minimal production logging
+    console.log('Checkout session requested');
+    
     const { userId, email } = req.body;
 
     if (!userId || !email) {
-      console.log('Missing required fields:', { userId, email });
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    console.log('Using price ID:', process.env.VITE_STRIPE_PREMIUM_PRICE_ID);
-    console.log('Environment variables:', {
-      FRONTEND_URL: process.env.FRONTEND_URL,
-      STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY ? 'Set' : 'Not set',
-      VITE_STRIPE_PREMIUM_PRICE_ID: process.env.VITE_STRIPE_PREMIUM_PRICE_ID ? 'Set' : 'Not set',
-    });
+    // Create a customer for better user management
+    let customerId;
+    
+    // Check if user already has a customer ID in Firestore
+    try {
+      const db = admin.firestore();
+      const userDoc = await db.collection('users').doc(userId).get();
+      
+      if (userDoc.exists && userDoc.data().stripeCustomerId) {
+        customerId = userDoc.data().stripeCustomerId;
+        console.log('Using existing Stripe customer:', customerId);
+      } else {
+        // Create a new customer
+        const customer = await stripe.customers.create({
+          email: email,
+          metadata: { userId }
+        });
+        customerId = customer.id;
+        console.log('Created new Stripe customer:', customerId);
+        
+        // Save customer ID to Firestore
+        if (userDoc.exists) {
+          await db.collection('users').doc(userId).update({
+            stripeCustomerId: customerId
+          });
+        } else {
+          await db.collection('users').doc(userId).set({
+            uid: userId,
+            email,
+            stripeCustomerId: customerId,
+            createdAt: new Date().toISOString()
+          });
+        }
+      }
+    } catch (customerError) {
+      console.error('Error managing customer:', customerError);
+      // Continue without customer ID if there's an error
+    }
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -131,10 +258,22 @@ app.post('/api/create-checkout-session', async (req, res) => {
       mode: 'subscription',
       success_url: `${process.env.FRONTEND_URL}/payment-success?user=${encodeURIComponent(userId)}`,
       cancel_url: `${process.env.FRONTEND_URL}/payment-canceled`,
-      customer_email: email,
+      customer: customerId || undefined,
+      customer_email: customerId ? undefined : email, // Only set if no customer ID
       client_reference_id: userId,
       metadata: {
         userId: userId
+      },
+      // Production best practices
+      allow_promotion_codes: true,
+      billing_address_collection: 'auto',
+      subscription_data: {
+        metadata: {
+          userId: userId
+        }
+      },
+      tax_id_collection: {
+        enabled: true
       }
     });
 
@@ -142,7 +281,12 @@ app.post('/api/create-checkout-session', async (req, res) => {
     res.json({ url: session.url });
   } catch (error) {
     console.error('Error creating checkout session:', error);
-    res.status(500).json({ error: 'Failed to create checkout session' });
+    res.status(500).json({ 
+      error: 'Failed to create checkout session',
+      message: process.env.NODE_ENV === 'production' 
+        ? 'An error occurred while processing your request' 
+        : error.message
+    });
   }
 });
 

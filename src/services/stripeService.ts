@@ -133,17 +133,26 @@ export const createCheckoutSession = async (userId: string, email: string) => {
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create checkout session');
+        const errorData = await response.json().catch(() => ({ error: 'Failed to create checkout session' }));
+        throw new Error(errorData.error || `Server responded with status: ${response.status}`);
       }
       
       const { url } = await response.json();
       
+      if (!url) {
+        throw new Error('Invalid response from server: Missing checkout URL');
+      }
+      
       // Redirect to checkout
       window.location.href = url;
     } catch (apiError) {
-      console.error('Server-side checkout failed, falling back to client-side:', apiError);
+      console.error('Server-side checkout failed:', apiError);
       
+      // In production, we should not fall back to client-side checkout
+      // This is to ensure all payments go through our server for proper tracking
+      throw new Error('Payment processing error. Please try again or contact support.');
+      
+      /* Fallback removed for production
       // Fallback to client-side if server fails
       const stripe = await stripePromise;
       
@@ -165,6 +174,7 @@ export const createCheckoutSession = async (userId: string, email: string) => {
         console.error('Stripe redirect error:', stripeError);
         throw stripeError;
       }
+      */
     }
   } catch (error) {
     console.error('Error creating checkout session:', error);
