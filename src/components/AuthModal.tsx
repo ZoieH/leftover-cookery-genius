@@ -50,8 +50,8 @@ export default function AuthModal({ isOpen, onClose, feature, onLoginSuccess }: 
 
       if (user) {
         toast({
-          title: activeTab === 'signup' ? "Account Created" : "Welcome Back",
-          description: "Please upgrade to premium to access this feature.",
+          title: activeTab === 'signup' ? "Welcome to Leftover Cookery Genius!" : "Welcome Back!",
+          description: "Happy cooking! We're glad to have you here.",
         });
         onClose();
         if (onLoginSuccess) {
@@ -79,8 +79,8 @@ export default function AuthModal({ isOpen, onClose, feature, onLoginSuccess }: 
 
       if (user) {
         toast({
-          title: "Welcome",
-          description: "Please upgrade to premium to access this feature.",
+          title: "Welcome!",
+          description: "Great to see you! Enjoy finding delicious recipes.",
         });
         onClose();
         if (onLoginSuccess) {

@@ -27,8 +27,8 @@ export default function EmailLinkAuthPage() {
 
       if (user) {
         toast({
-          title: "Welcome!",
-          description: "You've successfully signed in.",
+          title: "Welcome to Leftover Cookery Genius!",
+          description: "You're now signed in. Ready to cook something delicious?",
         });
         // Redirect to the previous page or home
         const returnUrl = sessionStorage.getItem('authReturnUrl') || '/';
