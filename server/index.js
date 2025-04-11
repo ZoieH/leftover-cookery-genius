@@ -240,6 +240,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
     console.log('Environment variables check:', {
       stripe_key_length: process.env.STRIPE_SECRET_KEY ? process.env.STRIPE_SECRET_KEY.length : 0,
       price_id_exists: !!process.env.VITE_STRIPE_PREMIUM_PRICE_ID,
+      price_id: process.env.VITE_STRIPE_PREMIUM_PRICE_ID,
       frontend_url: process.env.FRONTEND_URL,
       firebase_project: process.env.FIREBASE_PROJECT_ID,
       firebase_email_exists: !!process.env.FIREBASE_CLIENT_EMAIL,
@@ -253,83 +254,42 @@ app.post('/api/create-checkout-session', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Create a customer for better user management
-    let customerId;
-    
-    // Check if user already has a customer ID in Firestore
+    // Create a simplified checkout session - skipping customer creation for now
     try {
-      if (!admin.apps.length) {
-        console.error('Firebase Admin not initialized');
-        throw new Error('Firebase Admin not initialized');
-      }
-      
-      const db = admin.firestore();
-      console.log('Firestore connected, checking user doc');
-      const userDoc = await db.collection('users').doc(userId).get();
-      
-      if (userDoc.exists && userDoc.data().stripeCustomerId) {
-        customerId = userDoc.data().stripeCustomerId;
-        console.log('Using existing Stripe customer:', customerId);
-      } else {
-        // Create a new customer
-        const customer = await stripe.customers.create({
-          email: email,
-          metadata: { userId }
-        });
-        customerId = customer.id;
-        console.log('Created new Stripe customer:', customerId);
-        
-        // Save customer ID to Firestore
-        if (userDoc.exists) {
-          await db.collection('users').doc(userId).update({
-            stripeCustomerId: customerId
-          });
-        } else {
-          await db.collection('users').doc(userId).set({
-            uid: userId,
-            email,
-            stripeCustomerId: customerId,
-            createdAt: new Date().toISOString()
-          });
-        }
-      }
-    } catch (customerError) {
-      console.error('Error managing customer:', customerError);
-      // Continue without customer ID if there's an error
-    }
-
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price: process.env.VITE_STRIPE_PREMIUM_PRICE_ID,
-          quantity: 1,
-        },
-      ],
-      mode: 'subscription',
-      success_url: `${process.env.FRONTEND_URL}/payment-success?user=${encodeURIComponent(userId)}`,
-      cancel_url: `${process.env.FRONTEND_URL}/payment-canceled`,
-      customer: customerId || undefined,
-      customer_email: customerId ? undefined : email, // Only set if no customer ID
-      client_reference_id: userId,
-      metadata: {
-        userId: userId
-      },
-      // Production best practices
-      allow_promotion_codes: true,
-      billing_address_collection: 'auto',
-      subscription_data: {
+      console.log('Creating Stripe checkout session...');
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price: process.env.VITE_STRIPE_PREMIUM_PRICE_ID,
+            quantity: 1,
+          },
+        ],
+        mode: 'subscription',
+        success_url: `${process.env.FRONTEND_URL}/payment-success?user=${encodeURIComponent(userId)}`,
+        cancel_url: `${process.env.FRONTEND_URL}/payment-canceled`,
+        customer_email: email,
+        client_reference_id: userId,
         metadata: {
           userId: userId
         }
-      },
-      tax_id_collection: {
-        enabled: true
-      }
-    });
+      });
 
-    console.log('Created checkout session:', session.id);
-    res.json({ url: session.url });
+      console.log('Created checkout session:', session.id);
+      res.json({ url: session.url });
+    } catch (stripeError) {
+      console.error('Stripe API error details:', {
+        type: stripeError.type,
+        code: stripeError.code,
+        message: stripeError.message,
+        param: stripeError.param,
+        statusCode: stripeError.statusCode,
+        requestId: stripeError.requestId,
+        rawType: stripeError.raw?.type,
+        rawMessage: stripeError.raw?.message
+      });
+      throw stripeError; // Re-throw for general error handling
+    }
   } catch (error) {
     console.error('Error creating checkout session:', error);
     

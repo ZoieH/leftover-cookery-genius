@@ -121,11 +121,11 @@ export const createCheckoutSession = async (userId: string, email: string) => {
     
     // API approach - call our server to create a checkout session
     try {
-      // Use absolute URL for production environments
-      const apiUrl = import.meta.env.PROD 
+      // Full URL in production, relative in development
+      const apiUrl = window.location.hostname !== 'localhost' 
         ? `${window.location.origin}/api/create-checkout-session` 
         : '/api/create-checkout-session';
-        
+      
       console.log('Using API URL:', apiUrl);
       
       const response = await fetch(apiUrl, {
@@ -139,55 +139,36 @@ export const createCheckoutSession = async (userId: string, email: string) => {
         }),
       });
       
+      console.log('Stripe API Response Status:', response.status);
+      const responseText = await response.text();
+      console.log('Stripe API Response Body:', responseText);
+      
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error response:', response.status, errorText);
+        try {
+          const errorData = JSON.parse(responseText);
+          throw new Error(errorData.error || `Server responded with status: ${response.status}`);
+        } catch (parseError) {
+          throw new Error(`Server error (${response.status}): ${responseText || 'No response body'}`);
+        }
+      }
+      
+      try {
+        const data = JSON.parse(responseText);
+        const { url } = data;
         
-        const errorData = JSON.parse(errorText || '{"error": "Failed to create checkout session"}');
-        throw new Error(errorData.error || `Server responded with status: ${response.status}`);
+        if (!url) {
+          throw new Error('Invalid response from server: Missing checkout URL');
+        }
+        
+        console.log('Redirecting to Stripe checkout:', url);
+        // Redirect to checkout
+        window.location.href = url;
+      } catch (parseError) {
+        throw new Error(`Failed to parse response: ${parseError.message}`);
       }
-      
-      const responseData = await response.json();
-      const { url } = responseData;
-      
-      console.log('Checkout session created, redirecting to:', url);
-      
-      if (!url) {
-        throw new Error('Invalid response from server: Missing checkout URL');
-      }
-      
-      // Redirect to checkout
-      window.location.href = url;
     } catch (apiError) {
       console.error('Server-side checkout failed:', apiError);
-      
-      // In production, we should not fall back to client-side checkout
-      // This is to ensure all payments go through our server for proper tracking
       throw new Error('Payment processing error. Please try again or contact support.');
-      
-      /* Fallback removed for production
-      // Fallback to client-side if server fails
-      const stripe = await stripePromise;
-      
-      if (!stripe) {
-        throw new Error('Stripe failed to initialize');
-      }
-      
-      // Create a checkout session directly with Stripe
-      const { error: stripeError } = await stripe.redirectToCheckout({
-        lineItems: [{ price: import.meta.env.VITE_STRIPE_PREMIUM_PRICE_ID, quantity: 1 }],
-        mode: 'subscription',
-        // Use simple success/cancel URLs to avoid SPA routing issues
-        successUrl: `${window.location.origin}/payment-success?user=${encodeURIComponent(userId)}`,
-        cancelUrl: `${window.location.origin}/payment-canceled`,
-        customerEmail: email,
-      });
-      
-      if (stripeError) {
-        console.error('Stripe redirect error:', stripeError);
-        throw stripeError;
-      }
-      */
     }
   } catch (error) {
     console.error('Error creating checkout session:', error);
