@@ -1,14 +1,21 @@
 # Leftover Cookery Genius
 
-A web application that helps you reduce food waste by generating delicious recipes from your leftover ingredients.
+A web application that helps you create delicious recipes from leftover ingredients.
+
+## Recent Updates
+
+- Fixed OpenAI recipe parsing to handle markdown code blocks correctly
+- Improved recipe display to ensure all recipes are shown properly
+- Enhanced filtering logic for recipe recommendations
+- Added better handling of dietary tags for AI-generated recipes
 
 ## Features
 
-- **Image Recognition**: Upload images of your leftover ingredients using Google Gemini 1.5 Flash model
-- **Ingredient Management**: Edit, add, or remove identified ingredients
-- **Customizable Recipes**: Set dietary preferences and calorie limits
-- **Recipe Generation**: Get personalized recipes based on your available ingredients
-- **Recipe Sharing**: Share, print, or save your favorite recipes
+- Recipe recommendations based on your available ingredients
+- AI-powered recipe generation using OpenAI
+- Integration with Spoonacular API for a wide range of recipes
+- Premium subscription with Stripe integration
+- User authentication and recipe saving
 
 ## Project info
 
