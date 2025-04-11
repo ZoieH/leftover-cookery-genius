@@ -22,6 +22,16 @@
       "handle": "filesystem"
     },
     {
+      "src": "/payment-success",
+      "dest": "/dist/index.html",
+      "status": 200
+    },
+    {
+      "src": "/payment-canceled",
+      "dest": "/dist/index.html",
+      "status": 200
+    },
+    {
       "src": "/(.*)",
       "dest": "/dist/index.html"
     }

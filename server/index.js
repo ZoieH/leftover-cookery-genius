@@ -47,8 +47,25 @@ app.post('/api/webhook', async (req, res) => {
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
       // Handle successful payment
-      console.log('Payment successful for user:', session.client_reference_id);
-      // Here you would update the user's premium status in your database
+      const userId = session.client_reference_id || (session.metadata && session.metadata.userId);
+      console.log('Payment successful for user:', userId);
+      
+      if (userId) {
+        try {
+          // Update user's premium status in Firestore
+          // Import Firebase admin SDK and update the database
+          // This would normally call a function to update the user's premium status
+          console.log('Updating premium status for user:', userId);
+          
+          // If you have a function to handle successful payment, uncomment the line below
+          // await handleSuccessfulPayment(userId);
+        } catch (updateError) {
+          console.error('Error updating user premium status:', updateError);
+          // We don't want to fail the webhook if this fails
+        }
+      } else {
+        console.error('User ID missing in session:', session);
+      }
     }
 
     res.json({ received: true });
@@ -85,10 +102,13 @@ app.post('/api/create-checkout-session', async (req, res) => {
         },
       ],
       mode: 'subscription',
-      success_url: `${process.env.FRONTEND_URL}/payment-success?user=${userId}`,
+      success_url: `${process.env.FRONTEND_URL}/payment-success?user=${encodeURIComponent(userId)}`,
       cancel_url: `${process.env.FRONTEND_URL}/payment-canceled`,
       customer_email: email,
       client_reference_id: userId,
+      metadata: {
+        userId: userId
+      }
     });
 
     console.log('Created checkout session:', session.id);

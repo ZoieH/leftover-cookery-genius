@@ -156,7 +156,7 @@ export const createCheckoutSession = async (userId: string, email: string) => {
         lineItems: [{ price: import.meta.env.VITE_STRIPE_PREMIUM_PRICE_ID, quantity: 1 }],
         mode: 'subscription',
         // Use simple success/cancel URLs to avoid SPA routing issues
-        successUrl: `${window.location.origin}/payment-success?user=${userId}`,
+        successUrl: `${window.location.origin}/payment-success?user=${encodeURIComponent(userId)}`,
         cancelUrl: `${window.location.origin}/payment-canceled`,
         customerEmail: email,
       });
