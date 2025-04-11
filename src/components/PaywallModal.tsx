@@ -98,6 +98,9 @@ const PaywallModal = ({ isOpen, onClose, feature }: PaywallModalProps) => {
             <p className="text-sm text-muted-foreground mt-1">
               Cancel anytime. No commitment required.
             </p>
+            <p className="text-sm font-medium mt-2">
+              Use code <span className="font-bold text-primary">ZOIEFRIEND</span> for your first month free!
+            </p>
           </div>
 
           <div className="flex flex-col gap-2">

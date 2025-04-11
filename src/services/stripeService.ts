@@ -108,31 +108,23 @@ export const reactivateSubscription = async (userId: string): Promise<boolean> =
 
 export const createCheckoutSession = async (userId: string, email: string) => {
   try {
-    const stripe = await stripePromise;
+    // Use the Stripe Payment Link with coupon support
+    const paymentLinkUrl = "https://buy.stripe.com/cN26rbbQG1Ylb7y8ww";
     
-    if (!stripe) {
-      throw new Error('Stripe failed to initialize');
-    }
-
-    // Create a checkout session directly with Stripe
-    const { error: stripeError } = await stripe.redirectToCheckout({
-      lineItems: [{ 
-        price: PREMIUM_PRICE_ID, 
-        quantity: 1 
-      }],
-      mode: 'subscription',
-      successUrl: `${window.location.origin}/payment-success?user=${encodeURIComponent(userId)}`,
-      cancelUrl: `${window.location.origin}/payment-canceled`,
-      customerEmail: email,
-      clientReferenceId: userId,
-      billingAddressCollection: 'auto'
-    });
+    // Add client reference ID and prefilled email to the URL
+    const urlWithParams = new URL(paymentLinkUrl);
+    urlWithParams.searchParams.append("client_reference_id", userId);
+    urlWithParams.searchParams.append("prefilled_email", email);
     
-    if (stripeError) {
-      throw stripeError;
-    }
+    // Add success and cancel URL parameters
+    urlWithParams.searchParams.append("success_url", `${window.location.origin}/payment-success?user=${encodeURIComponent(userId)}`);
+    urlWithParams.searchParams.append("cancel_url", `${window.location.origin}/payment-canceled`);
+    
+    // Redirect to the payment link
+    window.location.href = urlWithParams.toString();
+    
   } catch (error) {
-    console.error('Error creating checkout session:', error);
+    console.error('Error redirecting to checkout:', error);
     throw new Error('Payment processing error. Please try again or contact support.');
   }
 };
