@@ -41,6 +41,9 @@ app.use(cors({
   credentials: true
 }));
 
+// Middleware to handle preflight requests
+app.options('*', cors());
+
 // Add security headers for production
 if (process.env.NODE_ENV === 'production') {
   app.use((req, res, next) => {
@@ -196,15 +199,31 @@ async function handleSubscriptionCancelled(subscription) {
   }
 }
 
+// Add a route to catch all methods for the checkout endpoint
+app.all('/api/create-checkout-session', (req, res, next) => {
+  if (req.method === 'POST') {
+    next();
+  } else {
+    console.warn(`Method ${req.method} not allowed on /api/create-checkout-session`);
+    res.status(405).json({ error: 'Method not allowed', allowedMethods: ['POST'] });
+  }
+});
+
 // Create checkout session endpoint
 app.post('/api/create-checkout-session', async (req, res) => {
   try {
-    // Minimal production logging
-    console.log('Checkout session requested');
+    // Debugging logs for Vercel deployment
+    console.log('Checkout request received', {
+      body: req.body,
+      method: req.method,
+      path: req.path,
+      headers: req.headers['content-type']
+    });
     
     const { userId, email } = req.body;
 
     if (!userId || !email) {
+      console.error('Missing required fields in request body');
       return res.status(400).json({ error: 'Missing required fields' });
     }
 

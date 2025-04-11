@@ -121,7 +121,14 @@ export const createCheckoutSession = async (userId: string, email: string) => {
     
     // API approach - call our server to create a checkout session
     try {
-      const response = await fetch('/api/create-checkout-session', {
+      // Use absolute URL for production environments
+      const apiUrl = import.meta.env.PROD 
+        ? `${window.location.origin}/api/create-checkout-session` 
+        : '/api/create-checkout-session';
+        
+      console.log('Using API URL:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -133,11 +140,17 @@ export const createCheckoutSession = async (userId: string, email: string) => {
       });
       
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to create checkout session' }));
+        const errorText = await response.text();
+        console.error('Error response:', response.status, errorText);
+        
+        const errorData = JSON.parse(errorText || '{"error": "Failed to create checkout session"}');
         throw new Error(errorData.error || `Server responded with status: ${response.status}`);
       }
       
-      const { url } = await response.json();
+      const responseData = await response.json();
+      const { url } = responseData;
+      
+      console.log('Checkout session created, redirecting to:', url);
       
       if (!url) {
         throw new Error('Invalid response from server: Missing checkout URL');
