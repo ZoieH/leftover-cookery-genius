@@ -7,8 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useUsageStore } from '@/services/usageService';
-import { AlertCircle, ArrowDown, Bug, ClipboardCopy, RefreshCw, ShieldAlert } from 'lucide-react';
+import { AlertCircle, ArrowDown, Bug, ClipboardCopy, RefreshCw, ShieldAlert, Receipt } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { PaymentTransactionDetails } from '@/services/stripeService';
 
 interface PaymentLog {
   id: string;
@@ -28,6 +29,8 @@ export default function PaymentDebugInfo() {
   const [userDocument, setUserDocument] = useState<any>(null);
   const [paymentLogs, setPaymentLogs] = useState<PaymentLog[]>([]);
   const [localStorageData, setLocalStorageData] = useState<Record<string, string>>({});
+  const [paymentTransactions, setPaymentTransactions] = useState<PaymentTransactionDetails[]>([]);
+  const [lastTransaction, setLastTransaction] = useState<PaymentTransactionDetails | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const { toast } = useToast();
@@ -78,10 +81,40 @@ export default function PaymentDebugInfo() {
       }
       setLocalStorageData(items);
       
+      // Load payment transactions
+      loadTransactionDetails();
+      
     } catch (error) {
       console.error('Error loading payment data:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+  
+  // Load transaction details from localStorage
+  const loadTransactionDetails = () => {
+    try {
+      // Load all transactions
+      const transactionsStr = localStorage.getItem('payment_transactions');
+      if (transactionsStr) {
+        const transactions = JSON.parse(transactionsStr);
+        // Filter for current user if we have a user
+        const userTransactions = user 
+          ? transactions.filter((t: PaymentTransactionDetails) => t.userId === user.uid)
+          : transactions;
+        setPaymentTransactions(userTransactions);
+      }
+      
+      // Load last transaction
+      const lastTransactionStr = localStorage.getItem('last_payment_transaction');
+      if (lastTransactionStr) {
+        const transaction = JSON.parse(lastTransactionStr);
+        if (!user || transaction.userId === user.uid) {
+          setLastTransaction(transaction);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading transaction details:', error);
     }
   };
 
@@ -126,6 +159,8 @@ export default function PaymentDebugInfo() {
     const data = {
       userDocument,
       paymentLogs,
+      paymentTransactions,
+      lastTransaction,
       localStorageData,
       clientStatus: {
         isPremium,
@@ -223,6 +258,12 @@ export default function PaymentDebugInfo() {
                 {paymentLogs.length} log{paymentLogs.length !== 1 ? 's' : ''}
               </Badge>
             )}
+            {lastTransaction && (
+              <Badge variant={lastTransaction.success ? "default" : "destructive"} className="ml-1">
+                <Receipt className="h-3 w-3 mr-1" />
+                Last payment: {lastTransaction.success ? 'Success' : 'Failed'}
+              </Badge>
+            )}
           </div>
           <ArrowDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
         </Button>
@@ -288,6 +329,29 @@ export default function PaymentDebugInfo() {
           </div>
         </div>
 
+        {/* Last Transaction Details */}
+        {lastTransaction && (
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+            <h3 className="text-sm font-semibold mb-2 flex items-center">
+              <Receipt className="h-4 w-4 mr-1" />
+              Last Payment Transaction
+              <Badge variant={lastTransaction.success ? "default" : "destructive"} className="ml-2">
+                {lastTransaction.success ? 'Success' : 'Failed'}
+              </Badge>
+            </h3>
+            <div className="text-xs space-y-1">
+              <div><strong>Date:</strong> {formatTimestamp(lastTransaction.timestamp)}</div>
+              <div><strong>Source:</strong> {lastTransaction.source || 'N/A'}</div>
+              {lastTransaction.stripeCustomerId && (
+                <div><strong>Stripe Customer ID:</strong> {lastTransaction.stripeCustomerId}</div>
+              )}
+              {lastTransaction.error && (
+                <div className="text-red-600"><strong>Error:</strong> {lastTransaction.error}</div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* User Document */}
         <div className="p-3 bg-muted rounded-md">
           <h3 className="text-sm font-semibold mb-2">User Document</h3>
@@ -302,6 +366,37 @@ export default function PaymentDebugInfo() {
             </div>
           )}
         </div>
+
+        {/* Payment Transactions */}
+        {paymentTransactions.length > 0 && (
+          <div>
+            <h3 className="text-sm font-semibold mb-2">Payment Transactions</h3>
+            <div className="text-xs overflow-auto max-h-40 border rounded-md">
+              <table className="w-full">
+                <thead className="bg-muted">
+                  <tr>
+                    <th className="p-2 text-left">Date</th>
+                    <th className="p-2 text-left">Source</th>
+                    <th className="p-2 text-left">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paymentTransactions.map((transaction, index) => (
+                    <tr key={index} className="border-t">
+                      <td className="p-2">{formatTimestamp(transaction.timestamp)}</td>
+                      <td className="p-2">{transaction.source || 'N/A'}</td>
+                      <td className="p-2">
+                        <Badge variant={transaction.success ? "default" : "destructive"} className="rounded-sm">
+                          {transaction.success ? "Success" : "Failed"}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Payment Logs */}
         <div>

@@ -141,9 +141,68 @@ export const createCheckoutSession = async (userId: string, email: string) => {
   }
 };
 
+// Define a transaction details interface
+export interface PaymentTransactionDetails {
+  userId: string;
+  transactionId?: string;
+  success: boolean;
+  error?: string;
+  amount?: string;
+  timestamp?: string;
+  source?: string;
+  stripeCustomerId?: string;
+  [key: string]: any; // Allow additional properties
+}
+
+// Add this function to store transaction details in a consistent format
+export const storePaymentTransactionDetails = (details: PaymentTransactionDetails) => {
+  // Create a standardized transaction record
+  const timestamp = details.timestamp || new Date().toISOString();
+  const transactionRecord = {
+    ...details,
+    timestamp,
+    recordedAt: new Date().toISOString()
+  };
+  
+  // Store in localStorage for persistence and debugging
+  try {
+    // Get existing transactions
+    const existingTransactionsStr = localStorage.getItem('payment_transactions');
+    const existingTransactions = existingTransactionsStr 
+      ? JSON.parse(existingTransactionsStr) 
+      : [];
+    
+    // Add new transaction
+    existingTransactions.unshift(transactionRecord);
+    
+    // Limit to most recent 10 transactions
+    const limitedTransactions = existingTransactions.slice(0, 10);
+    
+    // Save back to localStorage
+    localStorage.setItem('payment_transactions', JSON.stringify(limitedTransactions));
+    
+    // Set the most recent transaction for easy access
+    localStorage.setItem('last_payment_transaction', JSON.stringify(transactionRecord));
+    
+    console.log('Payment transaction recorded:', transactionRecord);
+  } catch (error) {
+    console.error('Error storing payment transaction:', error);
+  }
+  
+  return transactionRecord;
+};
+
 export const handleSuccessfulPayment = async (userId: string, nonce?: string) => {
   try {
     console.log('Updating premium status for user:', userId);
+    
+    // Transaction details to be recorded
+    const transactionDetails: PaymentTransactionDetails = {
+      userId,
+      success: false, // Will be updated at the end if successful
+      source: 'stripe',
+      nonce
+    };
     
     // Verify nonce to prevent duplicate processing if provided
     if (nonce) {
@@ -151,6 +210,7 @@ export const handleSuccessfulPayment = async (userId: string, nonce?: string) =>
       if (storedNonce && storedNonce !== nonce) {
         console.warn('Nonce mismatch, possible duplicate payment processing attempt');
         // Still continue as this might be a legitimate retry
+        transactionDetails.nonceMismatch = true;
       }
       // Clear the nonce to prevent reuse
       localStorage.removeItem('payment_nonce');
@@ -171,9 +231,15 @@ export const handleSuccessfulPayment = async (userId: string, nonce?: string) =>
       lastVerified: timestamp
     };
     
+    transactionDetails.timestamp = timestamp;
+    
     // Create transaction log for auditing and troubleshooting
+    let logId = '';
     try {
       const logRef = doc(collection(db, 'payment_logs'));
+      logId = logRef.id;
+      transactionDetails.logId = logId;
+      
       await setDoc(logRef, {
         userId,
         action: 'premium_activation',
@@ -187,6 +253,7 @@ export const handleSuccessfulPayment = async (userId: string, nonce?: string) =>
     } catch (logError) {
       // Non-critical error, just log and continue
       console.warn('Failed to create payment log:', logError);
+      transactionDetails.logError = String(logError);
     }
     
     // First try to update the database
@@ -218,6 +285,7 @@ export const handleSuccessfulPayment = async (userId: string, nonce?: string) =>
           createdAt: timestamp
         });
         console.log('Created new user document with premium status');
+        transactionDetails.documentCreated = true;
       } else {
         console.log('User document exists, updating premium status');
         // Update the existing user document, preserving other fields
@@ -225,6 +293,7 @@ export const handleSuccessfulPayment = async (userId: string, nonce?: string) =>
           ...premiumData
         });
         console.log('Updated user document with premium status');
+        transactionDetails.documentUpdated = true;
       }
       
       // Verify the update was successful
@@ -234,12 +303,20 @@ export const handleSuccessfulPayment = async (userId: string, nonce?: string) =>
       if (updatedData && updatedData.isPremium === true) {
         console.log('Premium status update verification successful');
         dbUpdateSuccess = true;
+        transactionDetails.verificationSuccess = true;
+        
+        // Store Stripe customer ID if available
+        if (updatedData.stripeCustomerId) {
+          transactionDetails.stripeCustomerId = updatedData.stripeCustomerId;
+        }
       } else {
         console.error('Premium status update verification failed');
+        transactionDetails.verificationFailed = true;
         // Continue to fallback mechanism
       }
     } catch (dbError) {
       console.error('Database update error:', dbError);
+      transactionDetails.dbError = String(dbError);
       // Continue to fallback mechanism
     }
     
@@ -264,6 +341,7 @@ export const handleSuccessfulPayment = async (userId: string, nonce?: string) =>
         currentAuthUserId: currentUser.uid,
         updatedUserId: userId
       });
+      transactionDetails.userMismatch = true;
     }
     
     // If database update failed, schedule a retry
@@ -286,14 +364,34 @@ export const handleSuccessfulPayment = async (userId: string, nonce?: string) =>
           // Try to process retry queue - this will be picked up by code that handles retries
           localStorage.setItem('premium_retry_requested', Date.now().toString());
         }, 5000);
+        
+        transactionDetails.retryScheduled = true;
       } catch (retryError) {
         console.error('Failed to schedule retry:', retryError);
+        transactionDetails.retryError = String(retryError);
       }
     }
+    
+    // Set final transaction status
+    transactionDetails.success = dbUpdateSuccess;
+    
+    // Store transaction details
+    storePaymentTransactionDetails(transactionDetails);
     
     return dbUpdateSuccess;
   } catch (error) {
     console.error('Error updating premium status:', error);
+    
+    // Record the failed transaction
+    const transactionDetails = {
+      userId,
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+      timestamp: new Date().toISOString(),
+      source: 'stripe'
+    };
+    storePaymentTransactionDetails(transactionDetails);
+    
     // Always ensure user gets premium access by updating local storage
     localStorage.setItem('isPremium', 'true');
     localStorage.setItem('premiumSince', new Date().toISOString());
