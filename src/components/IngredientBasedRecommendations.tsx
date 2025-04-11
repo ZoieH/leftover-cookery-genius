@@ -642,6 +642,143 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
               </Card>
             );
           })}
+          
+          {/* Always show the "You Might Also Like" section if there are alternative recipes */}
+          {alternativeRecipes.length > 0 && (
+            <div className="space-y-4 mt-8">
+              <h3 className="text-lg font-semibold text-muted-foreground">
+                You Might Also Like
+              </h3>
+              <div className="space-y-4">
+                {alternativeRecipes.map((recipe) => {
+                  const coverage = calculateIngredientCoverage(recipe, ingredients);
+                  const isExpanded = expandedRecipeId === String(recipe.id);
+                  
+                  return (
+                    <Card key={recipe.id} className={cn(
+                      "transition-all duration-200",
+                      isExpanded && "ring-2 ring-primary"
+                    )}>
+                      <CardHeader className="p-4 sm:p-6">
+                        <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                          {recipe.image && (
+                            <div className="flex-shrink-0 w-full sm:w-24 h-40 sm:h-24 rounded-md overflow-hidden mb-3 sm:mb-0">
+                              <img 
+                                src={recipe.image}
+                                alt={recipe.title}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                }}
+                              />
+                            </div>
+                          )}
+                          <div className="flex-1 space-y-1">
+                            <CardTitle className="text-xl sm:text-2xl">{recipe.title}</CardTitle>
+                            <CardDescription className="mt-1 text-sm">
+                              {isExpanded ? recipe.description : truncateDescription(recipe.description)}
+                            </CardDescription>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="self-start mt-2 sm:mt-0"
+                            onClick={() => toggleRecipeExpansion(String(recipe.id))}
+                          >
+                            {isExpanded ? "Show Less" : "Show More"}
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      
+                      {isExpanded && (
+                        <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
+                          <div className="space-y-4">
+                            <div className="flex flex-wrap gap-2">
+                              {recipe.dietaryTags.map((tag) => (
+                                <Badge key={tag} variant="secondary">
+                                  {tag}
+                                </Badge>
+                              ))}
+                            </div>
+                            
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                              <div className="flex items-center gap-2">
+                                <Clock className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                                <span>{recipe.prepTime} + {recipe.cookTime}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <User className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                                <span>Serves {recipe.servings}</span>
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <h3 className="font-medium">Ingredients</h3>
+                              <ul className="list-disc list-inside space-y-1">
+                                {recipe.ingredients.map((ingredient, index) => (
+                                  <li key={index} className="text-sm">
+                                    {ingredient}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        </CardContent>
+                      )}
+                      
+                      <CardFooter className="p-4 sm:p-6 flex flex-col sm:flex-row sm:justify-between gap-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline" className="whitespace-nowrap">
+                            {Math.round(coverage * 100)}% Match
+                          </Badge>
+                          {coverage < 1 && (
+                            <span className="text-xs text-muted-foreground">
+                              ({findMissingIngredients(recipe, ingredients).length} ingredients missing)
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleToggleSave(recipe)}
+                            disabled={isCheckingSaved}
+                          >
+                            {savedRecipes[String(recipe.id)] ? (
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                fill="currentColor"
+                                className="h-4 w-4 text-primary"
+                              >
+                                <path fillRule="evenodd" d="M6.32 2.577a49.255 49.255 0 0111.36 0c1.497.174 2.57 1.46 2.57 2.93V21a.75.75 0 01-1.085.67L12 18.089l-7.165 3.583A.75.75 0 013.75 21V5.507c0-1.47 1.073-2.756 2.57-2.93z" clipRule="evenodd" />
+                              </svg>
+                            ) : (
+                              <Bookmark className="h-4 w-4" />
+                            )}
+                            <span className="sr-only">
+                              {savedRecipes[String(recipe.id)] ? "Unsave Recipe" : "Save Recipe"}
+                            </span>
+                          </Button>
+                          {onSelectRecipe && (
+                            <Button
+                              size="sm"
+                              className="w-full sm:w-auto"
+                              onClick={() => onSelectRecipe(recipe)}
+                            >
+                              Select Recipe
+                            </Button>
+                          )}
+                        </div>
+                      </CardFooter>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
       <AuthModal 
