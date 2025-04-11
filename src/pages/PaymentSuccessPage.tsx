@@ -4,7 +4,7 @@ import { CheckCircle, Loader2, AlertTriangle, Bug, ClipboardCopy, Shield } from 
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import Layout from '@/components/Layout';
-import { handleSuccessfulPayment } from '@/services/stripeService';
+import { handleSuccessfulPayment, storePaymentTransactionDetails } from '@/services/stripeService';
 import { useUsageStore } from '@/services/usageService';
 import { useAuthStore } from '@/services/firebaseService';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -52,15 +52,17 @@ const PaymentSuccessPage = () => {
           return;
         }
 
+        // Set a flag in localStorage to indicate payment processing in progress
+        // This will be used for recovery if the page is closed before completion
+        localStorage.setItem('payment_success_pending', 'true');
+        localStorage.setItem('payment_user_id', userId);
+        if (nonce) {
+          localStorage.setItem('payment_nonce', nonce);
+        }
+
         // Immediately update local state for responsive UX
         setIsPremium(true);
         
-        // Set up recovery if the page is closed before processing completes
-        localStorage.setItem('payment_success_pending', 'true');
-        if (userId) {
-          localStorage.setItem('pending_premium_user_id', userId);
-        }
-
         // Get initial state for debugging
         const initialState = {
           localStorage: collectLocalStorageItems(),
@@ -71,6 +73,17 @@ const PaymentSuccessPage = () => {
         setDebugInfo(current => ({ ...current, initialState }));
         
         try {
+          // Record the payment success page visit
+          storePaymentTransactionDetails({
+            userId,
+            success: false, // Will be updated after DB update
+            source: 'payment-success-page',
+            timestamp: new Date().toISOString(),
+            status: 'processing',
+            nonce: nonce || undefined,
+            returnUrl: returnUrl || undefined
+          });
+
           // If we have a userId, update premium status in the database
           if (userId) {
             // First try to sync premium status if user is logged in to ensure we get the latest state
@@ -89,6 +102,7 @@ const PaymentSuccessPage = () => {
               }));
             }
             
+            // Process the payment through our main handler
             const dbUpdateSuccess = await handleSuccessfulPayment(userId, nonce);
             
             // Log status after payment processing
@@ -106,6 +120,11 @@ const PaymentSuccessPage = () => {
             
             if (!dbUpdateSuccess) {
               setWarning('Your premium status was activated, but we encountered an issue syncing with our server. Your access is still enabled, and we\'ll automatically retry the sync.');
+            } else {
+              // Clear payment processing flags on successful DB update
+              localStorage.removeItem('payment_success_pending');
+              localStorage.removeItem('payment_user_id');
+              localStorage.removeItem('payment_nonce');
             }
             
             // Re-sync to ensure everything is updated correctly
@@ -158,11 +177,18 @@ const PaymentSuccessPage = () => {
               timestamp: new Date().toISOString()
             }
           }));
+          
+          // Record the error for later analysis
+          storePaymentTransactionDetails({
+            userId,
+            success: false,
+            source: 'payment-success-page',
+            timestamp: new Date().toISOString(),
+            status: 'error',
+            error: updateError instanceof Error ? updateError.message : String(updateError),
+            nonce: nonce || undefined
+          });
         }
-        
-        // Clear pending flags since we've handled the payment
-        localStorage.removeItem('payment_success_pending');
-        localStorage.removeItem('pending_premium_user_id');
         
         // Always mark as success for user experience
         setSuccess(true);
@@ -208,10 +234,31 @@ const PaymentSuccessPage = () => {
             timestamp: new Date().toISOString()
           }
         }));
+        
+        // Record the critical error
+        if (user) {
+          storePaymentTransactionDetails({
+            userId: user.uid,
+            success: false,
+            source: 'payment-success-page',
+            timestamp: new Date().toISOString(),
+            status: 'critical-error',
+            error: error.message || String(error)
+          });
+        }
       }
     };
 
     processPayment();
+    
+    // This cleanup function will run if the component unmounts before processing is complete
+    return () => {
+      // If we're still processing, make sure we don't lose the payment info
+      if (processing) {
+        console.log('Payment success page unmounted while processing - preserving payment info for recovery');
+        // Don't remove any payment flags if we're still processing
+      }
+    };
   }, [location.search, toast, setIsPremium, syncPremiumStatus, navigate, user]);
 
   // Helper function to collect relevant localStorage items

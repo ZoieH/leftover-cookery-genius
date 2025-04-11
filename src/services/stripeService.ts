@@ -113,24 +113,52 @@ export const reactivateSubscription = async (userId: string): Promise<boolean> =
 
 export const createCheckoutSession = async (userId: string, email: string) => {
   try {
-    // Use the Stripe Payment Link with coupon support
-    const paymentLinkUrl = "https://buy.stripe.com/cN26rbbQG1Ylb7y8ww";
+    console.log('Creating checkout session for user:', userId);
     
     // Store current page path for returning after payment
     const currentPage = window.location.pathname;
     localStorage.setItem('payment_return_url', currentPage);
     
+    // Store payment initiation time to detect abandoned checkout sessions
+    localStorage.setItem('payment_initiated', Date.now().toString());
+    
+    // Generate a secure nonce for this payment session
+    const nonce = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    localStorage.setItem('payment_nonce', nonce);
+    
+    // Store the user ID associated with this payment attempt
+    localStorage.setItem('payment_user_id', userId);
+    
+    // Record the payment initiation
+    storePaymentTransactionDetails({
+      userId,
+      success: false,
+      source: 'stripe',
+      timestamp: new Date().toISOString(),
+      status: 'initiated',
+      nonce
+    });
+    
+    // Use the Stripe Payment Link with coupon support
+    const paymentLinkUrl = "https://buy.stripe.com/cN26rbbQG1Ylb7y8ww";
+    
     // Add client reference ID and prefilled email to the URL
     const urlWithParams = new URL(paymentLinkUrl);
+    
+    // Critical: client_reference_id is used to identify the user
     urlWithParams.searchParams.append("client_reference_id", userId);
     urlWithParams.searchParams.append("prefilled_email", email);
     
     // Add success and cancel URL parameters with proper encoding
-    const successUrl = `${window.location.origin}/payment-success?user=${encodeURIComponent(userId)}&success=true&returnUrl=${encodeURIComponent(currentPage)}`;
-    const cancelUrl = `${window.location.origin}/payment-canceled?returnUrl=${encodeURIComponent(currentPage)}`;
+    // Include nonce to prevent CSRF attacks and enable secure verification
+    const successUrl = `${window.location.origin}/payment-success?user=${encodeURIComponent(userId)}&nonce=${encodeURIComponent(nonce)}&success=true&returnUrl=${encodeURIComponent(currentPage)}`;
+    const cancelUrl = `${window.location.origin}/payment-canceled?nonce=${encodeURIComponent(nonce)}&returnUrl=${encodeURIComponent(currentPage)}`;
     
     urlWithParams.searchParams.append("success_url", successUrl);
     urlWithParams.searchParams.append("cancel_url", cancelUrl);
+    
+    // For debugging
+    console.log('Payment link URL:', urlWithParams.toString());
     
     // Redirect to the payment link
     window.location.href = urlWithParams.toString();
@@ -536,3 +564,88 @@ export const initializeRetryProcessor = () => {
 
 // Initialize the retry processor
 initializeRetryProcessor();
+
+// Add automatic payment recovery/verification on app load
+export const attemptPaymentRecovery = async () => {
+  try {
+    console.log('Checking for pending payments to recover...');
+    
+    // Check if there's a pending payment in localStorage
+    const paymentUserId = localStorage.getItem('payment_user_id');
+    const paymentNonce = localStorage.getItem('payment_nonce');
+    const paymentSuccess = localStorage.getItem('payment_success_pending');
+    
+    // If no pending payment, exit early
+    if (!paymentUserId || !paymentSuccess) {
+      return false;
+    }
+    
+    console.log('Found pending payment for user:', paymentUserId);
+    
+    // Record the recovery attempt
+    storePaymentTransactionDetails({
+      userId: paymentUserId,
+      success: false, // Will be updated if successful
+      source: 'stripe-recovery',
+      timestamp: new Date().toISOString(),
+      status: 'recovery-attempted',
+      nonce: paymentNonce || undefined
+    });
+    
+    // Attempt to update the premium status
+    const currentUser = auth.currentUser;
+    
+    // Only proceed if the user is logged in
+    if (currentUser && currentUser.uid === paymentUserId) {
+      // Update the user's premium status
+      const success = await handleSuccessfulPayment(paymentUserId, paymentNonce || undefined);
+      
+      // Clean up localStorage
+      localStorage.removeItem('payment_success_pending');
+      localStorage.removeItem('payment_user_id');
+      localStorage.removeItem('payment_nonce');
+      
+      // Record the result
+      storePaymentTransactionDetails({
+        userId: paymentUserId,
+        success: success,
+        source: 'stripe-recovery',
+        timestamp: new Date().toISOString(),
+        status: success ? 'recovery-success' : 'recovery-failed'
+      });
+      
+      return success;
+    } else if (currentUser) {
+      console.warn('User mismatch during payment recovery', {
+        storedUserId: paymentUserId,
+        currentUserId: currentUser.uid
+      });
+      
+      // Record the mismatch
+      storePaymentTransactionDetails({
+        userId: paymentUserId,
+        success: false,
+        source: 'stripe-recovery',
+        timestamp: new Date().toISOString(),
+        status: 'recovery-user-mismatch',
+        currentUserId: currentUser.uid
+      });
+    } else {
+      console.log('User not logged in during payment recovery');
+      
+      // Record the lack of authentication
+      storePaymentTransactionDetails({
+        userId: paymentUserId,
+        success: false,
+        source: 'stripe-recovery',
+        timestamp: new Date().toISOString(),
+        status: 'recovery-no-auth'
+      });
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Error during payment recovery:', error);
+    return false;
+  }
+};

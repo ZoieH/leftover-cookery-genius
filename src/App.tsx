@@ -15,11 +15,14 @@ import UserPortalPage from '@/pages/UserPortalPage';
 import PaymentSuccessPage from '@/pages/PaymentSuccessPage';
 import PaymentCanceledPage from '@/pages/PaymentCanceledPage';
 import { initializeUsageService } from '@/services/usageService';
-import { initializeRetryProcessor } from '@/services/stripeService';
+import { initializeRetryProcessor, attemptPaymentRecovery } from '@/services/stripeService';
+import { useAuthStore } from '@/services/firebaseService';
 
 const queryClient = new QueryClient();
 
 const App = () => {
+  const { user, loading } = useAuthStore();
+
   // Initialize services
   useEffect(() => {
     // Initialize usage service (premium status checks)
@@ -33,6 +36,25 @@ const App = () => {
       if (cleanupRetryProcessor) cleanupRetryProcessor();
     };
   }, []);
+
+  // Attempt payment recovery when user is authenticated
+  useEffect(() => {
+    // Only try to recover payments when:
+    // 1. Auth loading is complete
+    // 2. User is authenticated
+    if (!loading && user) {
+      // Attempt payment recovery
+      attemptPaymentRecovery()
+        .then(success => {
+          if (success) {
+            console.log('Successfully recovered payment status');
+          }
+        })
+        .catch(error => {
+          console.error('Error during payment recovery:', error);
+        });
+    }
+  }, [user, loading]);
 
   return (
     <QueryClientProvider client={queryClient}>
