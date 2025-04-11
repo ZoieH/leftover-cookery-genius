@@ -90,7 +90,31 @@ Format the response as a JSON object with the following structure:
     console.log('OpenAI API response received');
     
     try {
-      const recipeData: OpenAIRecipeResponse = JSON.parse(data.choices[0].message.content);
+      // Clean up the response content by removing markdown code blocks
+      const content = data.choices[0].message.content;
+      
+      // Remove markdown code blocks (```json and ```)
+      let cleanedContent = content
+        .replace(/```json\s+/g, '')
+        .replace(/```\s*$/g, '')
+        .replace(/```/g, '')
+        .trim();
+      
+      // If the response is still not valid JSON, try to extract the JSON object pattern
+      try {
+        JSON.parse(cleanedContent);
+      } catch (e) {
+        // Try to extract the JSON object using regex
+        const jsonPattern = /(\{[\s\S]*\})/s;
+        const match = cleanedContent.match(jsonPattern);
+        if (match && match[0]) {
+          cleanedContent = match[0];
+        }
+      }
+      
+      console.log('Cleaned content:', cleanedContent.substring(0, 100) + '...');
+      
+      const recipeData: OpenAIRecipeResponse = JSON.parse(cleanedContent);
       console.log('Successfully parsed recipe data from OpenAI');
 
       // Convert OpenAI response to our Recipe format
