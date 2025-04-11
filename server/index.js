@@ -1,18 +1,37 @@
-import express from 'express';
-import cors from 'cors';
-import Stripe from 'stripe';
-import dotenv from 'dotenv';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-import path from 'path';
+const express = require('express');
+const cors = require('cors');
+const Stripe = require('stripe');
+const dotenv = require('dotenv');
+const path = require('path');
+const admin = require('firebase-admin');
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// Load environment variables
+dotenv.config();
 
-dotenv.config({ path: path.join(__dirname, '../.env') });
+// Initialize Stripe with the secret key
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+// Initialize Firebase Admin (if environment variables are set)
+if (process.env.FIREBASE_PROJECT_ID && 
+    process.env.FIREBASE_CLIENT_EMAIL && 
+    process.env.FIREBASE_PRIVATE_KEY) {
+  try {
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      }),
+    });
+    console.log('Firebase Admin SDK initialized');
+  } catch (error) {
+    console.error('Error initializing Firebase Admin SDK:', error);
+  }
+} else {
+  console.warn('Firebase Admin SDK credentials not provided - webhook cannot update database');
+}
 
 const app = express();
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 // Middleware for CORS
 app.use(cors({
@@ -52,13 +71,21 @@ app.post('/api/webhook', async (req, res) => {
       
       if (userId) {
         try {
-          // Update user's premium status in Firestore
-          // Import Firebase admin SDK and update the database
-          // This would normally call a function to update the user's premium status
-          console.log('Updating premium status for user:', userId);
+          // Update user's premium status in Firestore using Firebase Admin SDK
+          const db = admin.firestore();
+          const premiumData = {
+            isPremium: true,
+            premiumSince: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            subscriptionId: session.subscription,
+            stripeCustomerId: session.customer,
+            subscriptionStatus: 'active'
+          };
           
-          // If you have a function to handle successful payment, uncomment the line below
-          // await handleSuccessfulPayment(userId);
+          // Update Firestore using document ID as userId
+          await db.collection('users').doc(userId).set(premiumData, { merge: true });
+          
+          console.log('Successfully updated premium status for user:', userId);
         } catch (updateError) {
           console.error('Error updating user premium status:', updateError);
           // We don't want to fail the webhook if this fails

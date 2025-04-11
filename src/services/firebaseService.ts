@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, getDocs, addDoc, query, where, updateDoc } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, addDoc, query, where, updateDoc, doc, getDoc, setDoc } from 'firebase/firestore';
 import type { LocalRecipe, RecipeSearchParams, Recipe } from '@/types/recipe';
 import { RecipeSource } from '@/types/recipe';
 import { 
@@ -254,13 +254,13 @@ export const isUserPremium = async (user: User | null): Promise<boolean> => {
   if (!user) return false;
   
   try {
-    // Query the users collection for the current user's premium status
-    const userQuery = query(usersCollection, where('uid', '==', user.uid));
-    const querySnapshot = await getDocs(userQuery);
+    // Use document ID as the user ID for consistency with the server
+    const userDocRef = doc(db, 'users', user.uid);
+    const userDoc = await getDoc(userDocRef);
     
-    if (querySnapshot.empty) {
+    if (!userDoc.exists()) {
       // If no document exists, create one with default premium status
-      await addDoc(usersCollection, {
+      await setDoc(userDocRef, {
         uid: user.uid,
         email: user.email,
         isPremium: false,
@@ -269,8 +269,7 @@ export const isUserPremium = async (user: User | null): Promise<boolean> => {
       return false;
     }
     
-    // Get the first document (there should only be one per user)
-    const userDoc = querySnapshot.docs[0];
+    // Get the premium status from the document
     return userDoc.data().isPremium || false;
   } catch (error) {
     console.error('Error checking premium status:', error);
@@ -284,26 +283,27 @@ export const upgradeToPremium = async (user: User | null): Promise<{ success: bo
   }
 
   try {
-    // Query the users collection for the current user
-    const userQuery = query(usersCollection, where('uid', '==', user.uid));
-    const querySnapshot = await getDocs(userQuery);
+    // Use document ID as the user ID for consistency
+    const userDocRef = doc(db, 'users', user.uid);
+    const userDoc = await getDoc(userDocRef);
     
-    if (querySnapshot.empty) {
+    const premiumData = {
+      isPremium: true,
+      premiumSince: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    
+    if (!userDoc.exists()) {
       // Create new user document with premium status
-      await addDoc(usersCollection, {
+      await setDoc(userDocRef, {
         uid: user.uid,
         email: user.email,
-        isPremium: true,
-        premiumSince: new Date().toISOString(),
+        ...premiumData,
         createdAt: new Date().toISOString()
       });
     } else {
       // Update existing user document
-      const userDoc = querySnapshot.docs[0];
-      await updateDoc(userDoc.ref, {
-        isPremium: true,
-        premiumSince: new Date().toISOString()
-      });
+      await updateDoc(userDocRef, premiumData);
     }
     
     return { success: true };

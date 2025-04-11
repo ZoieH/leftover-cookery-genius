@@ -32,8 +32,9 @@ export const useUsageStore = create<UsageStore>()(
         }
         
         try {
-          // Check premium status from backend
+          // Always check premium status from backend when user logs in
           const premiumStatus = await isUserPremium(user);
+          console.log('Synced premium status:', premiumStatus);
           set({ 
             isPremium: premiumStatus,
             lastPremiumCheck: Date.now()
@@ -47,6 +48,10 @@ export const useUsageStore = create<UsageStore>()(
     }),
     {
       name: 'usage-storage',
+      // Don't persist the premium status - always check from server
+      partialize: (state) => ({
+        searchCount: state.searchCount
+      })
     }
   )
 );
@@ -54,10 +59,10 @@ export const useUsageStore = create<UsageStore>()(
 // Maximum number of searches for free users
 const MAX_FREE_SEARCHES = 3;
 
-// Check if premium status needs refresh (every hour)
+// Check if premium status needs refresh (every 5 minutes)
 const needsPremiumRefresh = () => {
   const { lastPremiumCheck } = useUsageStore.getState();
-  return Date.now() - lastPremiumCheck > 60 * 60 * 1000; // 1 hour
+  return Date.now() - lastPremiumCheck > 5 * 60 * 1000; // 5 minutes
 };
 
 export const canPerformSearch = async () => {

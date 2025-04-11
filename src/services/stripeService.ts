@@ -185,7 +185,8 @@ export const handleSuccessfulPayment = async (userId: string) => {
     const premiumData = {
       isPremium: true,
       premiumSince: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      subscriptionStatus: 'active'
     };
     
     if (!userDoc.exists()) {
