@@ -111,14 +111,18 @@ export const createCheckoutSession = async (userId: string, email: string) => {
     // Use the Stripe Payment Link with coupon support
     const paymentLinkUrl = "https://buy.stripe.com/cN26rbbQG1Ylb7y8ww";
     
+    // Store current page path for returning after payment
+    const currentPage = window.location.pathname;
+    localStorage.setItem('payment_return_url', currentPage);
+    
     // Add client reference ID and prefilled email to the URL
     const urlWithParams = new URL(paymentLinkUrl);
     urlWithParams.searchParams.append("client_reference_id", userId);
     urlWithParams.searchParams.append("prefilled_email", email);
     
     // Add success and cancel URL parameters with proper encoding
-    const successUrl = `${window.location.origin}/payment-success?user=${encodeURIComponent(userId)}&success=true`;
-    const cancelUrl = `${window.location.origin}/payment-canceled?returnUrl=${encodeURIComponent(window.location.pathname)}`;
+    const successUrl = `${window.location.origin}/payment-success?user=${encodeURIComponent(userId)}&success=true&returnUrl=${encodeURIComponent(currentPage)}`;
+    const cancelUrl = `${window.location.origin}/payment-canceled?returnUrl=${encodeURIComponent(currentPage)}`;
     
     urlWithParams.searchParams.append("success_url", successUrl);
     urlWithParams.searchParams.append("cancel_url", cancelUrl);

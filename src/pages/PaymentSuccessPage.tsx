@@ -22,6 +22,7 @@ const PaymentSuccessPage = () => {
         const params = new URLSearchParams(location.search);
         const userId = params.get('user');
         const sessionId = params.get('session_id'); // Also check for session_id from server-side flow
+        const returnUrl = params.get('returnUrl'); // Get return URL from params
         
         console.log('Processing payment success for user:', userId, 'session:', sessionId);
 
@@ -80,10 +81,22 @@ const PaymentSuccessPage = () => {
           });
         }
         
-        // Auto-redirect after 3 seconds
+        // Get return URL from params or localStorage
+        let redirectUrl = '/';
+        if (returnUrl) {
+          redirectUrl = decodeURIComponent(returnUrl);
+        } else {
+          const storedReturnUrl = localStorage.getItem('payment_return_url');
+          if (storedReturnUrl) {
+            redirectUrl = storedReturnUrl;
+            localStorage.removeItem('payment_return_url'); // Clean up
+          }
+        }
+        
+        // Auto-redirect after 2 seconds
         setTimeout(() => {
-          navigate('/');
-        }, 3000);
+          navigate(redirectUrl);
+        }, 2000);
       } catch (error: any) {
         console.error('Error processing payment:', error);
         toast({
@@ -124,7 +137,22 @@ const PaymentSuccessPage = () => {
               </p>
               <Button 
                 onClick={() => {
-                  navigate('/');
+                  // Get return URL from params or localStorage
+                  const params = new URLSearchParams(location.search);
+                  const returnUrl = params.get('returnUrl');
+                  let redirectUrl = '/';
+                  
+                  if (returnUrl) {
+                    redirectUrl = decodeURIComponent(returnUrl);
+                  } else {
+                    const storedReturnUrl = localStorage.getItem('payment_return_url');
+                    if (storedReturnUrl) {
+                      redirectUrl = storedReturnUrl;
+                      localStorage.removeItem('payment_return_url'); // Clean up
+                    }
+                  }
+                  
+                  navigate(redirectUrl);
                 }} 
                 className="w-full"
               >
