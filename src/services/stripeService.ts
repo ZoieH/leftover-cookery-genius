@@ -1,6 +1,7 @@
 import { loadStripe } from '@stripe/stripe-js';
 import { getFirestore, collection, addDoc, updateDoc, query, where, getDocs, doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
-import { db } from './firebaseService';
+import { db, auth } from './firebaseService';
+import { useUsageStore } from './usageService';
 
 // Initialize Stripe
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
@@ -108,30 +109,56 @@ export const reactivateSubscription = async (userId: string): Promise<boolean> =
 
 export const createCheckoutSession = async (userId: string, email: string) => {
   try {
-    // Use the Stripe Payment Link with coupon support
-    const paymentLinkUrl = "https://buy.stripe.com/cN26rbbQG1Ylb7y8ww";
+    console.log('Creating checkout session for user:', userId);
+    
+    // Instead of using the Payment Link which is causing errors,
+    // let's create a checkout session directly with the Stripe API
+    
+    // First, get the Stripe instance
+    const stripe = await stripePromise;
+    if (!stripe) {
+      throw new Error('Failed to initialize Stripe');
+    }
     
     // Store current page path for returning after payment
     const currentPage = window.location.pathname;
     localStorage.setItem('payment_return_url', currentPage);
     
-    // Add client reference ID and prefilled email to the URL
-    const urlWithParams = new URL(paymentLinkUrl);
-    urlWithParams.searchParams.append("client_reference_id", userId);
-    urlWithParams.searchParams.append("prefilled_email", email);
+    // Create properly formatted and encoded URLs for success and cancel
+    const origin = window.location.origin;
+    const successUrl = new URL(`${origin}/payment-success`);
+    successUrl.searchParams.append('user', userId);
+    successUrl.searchParams.append('success', 'true');
+    successUrl.searchParams.append('returnUrl', currentPage);
     
-    // Add success and cancel URL parameters with proper encoding
-    const successUrl = `${window.location.origin}/payment-success?user=${encodeURIComponent(userId)}&success=true&returnUrl=${encodeURIComponent(currentPage)}`;
-    const cancelUrl = `${window.location.origin}/payment-canceled?returnUrl=${encodeURIComponent(currentPage)}`;
+    const cancelUrl = new URL(`${origin}/payment-canceled`);
+    cancelUrl.searchParams.append('returnUrl', currentPage);
     
-    urlWithParams.searchParams.append("success_url", successUrl);
-    urlWithParams.searchParams.append("cancel_url", cancelUrl);
+    console.log('Success URL:', successUrl.toString());
+    console.log('Cancel URL:', cancelUrl.toString());
     
-    // Redirect to the payment link
-    window.location.href = urlWithParams.toString();
+    // Create the checkout session
+    const { error } = await stripe.redirectToCheckout({
+      mode: 'subscription',
+      lineItems: [
+        {
+          price: PREMIUM_PRICE_ID,
+          quantity: 1,
+        },
+      ],
+      successUrl: successUrl.toString(),
+      cancelUrl: cancelUrl.toString(),
+      clientReferenceId: userId,
+      customerEmail: email,
+    });
+    
+    if (error) {
+      console.error('Stripe checkout error:', error);
+      throw new Error(error.message || 'Payment processing error. Please try again.');
+    }
     
   } catch (error) {
-    console.error('Error redirecting to checkout:', error);
+    console.error('Error creating checkout session:', error);
     throw new Error('Payment processing error. Please try again or contact support.');
   }
 };
@@ -139,6 +166,8 @@ export const createCheckoutSession = async (userId: string, email: string) => {
 export const handleSuccessfulPayment = async (userId: string) => {
   try {
     console.log('Updating premium status for user:', userId);
+    
+    // Update both Firebase and local storage to ensure premium status persists
     const userDocRef = doc(db, 'users', userId);
     
     // Enhanced premium data with Stripe information
@@ -156,35 +185,80 @@ export const handleSuccessfulPayment = async (userId: string) => {
     
     if (!userDoc.exists()) {
       console.log('User document not found, creating new document');
-      // Create a new user document if it doesn't exist
+      
+      // Get the current authenticated user to ensure we have all the user info
+      const currentUser = auth.currentUser;
+      let email = '';
+      
+      if (currentUser && currentUser.uid === userId) {
+        email = currentUser.email || '';
+        console.log('Using authenticated user email:', email);
+      } else {
+        console.log('User not currently authenticated, using minimal data');
+      }
+      
+      // Create a new user document with all available information
       await setDoc(userDocRef, {
         uid: userId,
+        email: email,
         ...premiumData,
         createdAt: new Date().toISOString()
       });
       console.log('Created new user document with premium status');
     } else {
       console.log('User document exists, updating premium status');
-      // Update the existing user document
-      await updateDoc(userDocRef, premiumData);
+      // Update the existing user document, preserving other fields
+      await updateDoc(userDocRef, {
+        ...premiumData
+      });
       console.log('Updated user document with premium status');
     }
     
     // Double-check the update was successful
     const updatedDoc = await getDoc(userDocRef);
-    console.log('Updated user data:', updatedDoc.data());
+    const updatedData = updatedDoc.data();
+    console.log('Updated user data:', updatedData);
+    
+    if (!updatedData || updatedData.isPremium !== true) {
+      console.error('Premium status update verification failed');
+      throw new Error('Failed to update premium status in database');
+    }
     
     // Always update local storage for client-side detection
+    console.log('Updating localStorage with premium status');
     localStorage.setItem('isPremium', 'true');
-    localStorage.setItem('premiumSince', new Date().toISOString());
-    console.log('Updated localStorage with premium status');
+    localStorage.setItem('premiumSince', premiumData.premiumSince);
+    localStorage.setItem('premiumUserId', userId); // Store the user ID for cross-referencing
     
+    // Force sync with the server once more to confirm the update
+    console.log('Forcing sync with server for final confirmation');
+    try {
+      const currentUser = auth.currentUser;
+      if (currentUser && currentUser.uid === userId) {
+        // This will update the global state as well
+        await useUsageStore.getState().syncPremiumStatus();
+      } else {
+        // Update the usage store state directly if we can't sync
+        useUsageStore.getState().setIsPremium(true);
+      }
+    } catch (syncError) {
+      console.error('Error during final sync:', syncError);
+      // Still set premium in the store even if sync fails
+      useUsageStore.getState().setIsPremium(true);
+    }
+    
+    console.log('Premium status update complete');
     return true;
   } catch (error) {
     console.error('Error updating premium status:', error);
     // Always ensure user gets premium access by updating local storage
     localStorage.setItem('isPremium', 'true');
     localStorage.setItem('premiumSince', new Date().toISOString());
+    localStorage.setItem('premiumUserId', userId);
+    
+    // Update the store state
+    useUsageStore.getState().setIsPremium(true);
+    
     throw error;
   }
 }; 

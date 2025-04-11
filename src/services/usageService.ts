@@ -27,16 +27,21 @@ export const useUsageStore = create<UsageStore>()(
       syncPremiumStatus: async () => {
         const { user } = useAuthStore.getState();
         if (!user) {
+          console.log('No user found, setting premium status to false');
           set({ isPremium: false });
           return false;
         }
         
         try {
+          console.log('Starting premium status sync for user:', user.uid);
+          
           // First check localStorage as a fallback mechanism
           const localPremium = localStorage.getItem('isPremium');
+          const localPremiumUserId = localStorage.getItem('premiumUserId');
           
-          if (localPremium === 'true') {
-            console.log('Premium status found in localStorage');
+          // Check if the localStorage premium status matches the current user
+          if (localPremium === 'true' && localPremiumUserId === user.uid) {
+            console.log('Premium status found in localStorage for current user');
             set({ 
               isPremium: true,
               lastPremiumCheck: Date.now()
@@ -45,8 +50,22 @@ export const useUsageStore = create<UsageStore>()(
           }
           
           // Then try to fetch from server
+          console.log('Checking premium status from server...');
           const premiumStatus = await isUserPremium(user);
           console.log('Synced premium status from server:', premiumStatus);
+          
+          if (premiumStatus) {
+            // If the user is premium, update localStorage with correct user ID
+            console.log('Setting localStorage premium status to true');
+            localStorage.setItem('isPremium', 'true');
+            localStorage.setItem('premiumUserId', user.uid);
+            localStorage.setItem('premiumSince', new Date().toISOString());
+          } else {
+            console.log('Setting localStorage premium status to false');
+            localStorage.setItem('isPremium', 'false');
+          }
+          
+          console.log('Updating premium status in store to:', premiumStatus);
           set({ 
             isPremium: premiumStatus,
             lastPremiumCheck: Date.now()
@@ -57,7 +76,9 @@ export const useUsageStore = create<UsageStore>()(
           
           // Check localStorage as fallback if server check fails
           const localPremium = localStorage.getItem('isPremium');
-          if (localPremium === 'true') {
+          const localPremiumUserId = localStorage.getItem('premiumUserId');
+          
+          if (localPremium === 'true' && localPremiumUserId === user.uid) {
             console.log('Using premium status from localStorage after server error');
             set({ 
               isPremium: true,

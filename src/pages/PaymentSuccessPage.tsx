@@ -6,6 +6,7 @@ import { useToast } from '@/components/ui/use-toast';
 import Layout from '@/components/Layout';
 import { handleSuccessfulPayment } from '@/services/stripeService';
 import { useUsageStore } from '@/services/usageService';
+import { useAuthStore } from '@/services/firebaseService';
 
 const PaymentSuccessPage = () => {
   const navigate = useNavigate();
@@ -24,16 +25,38 @@ const PaymentSuccessPage = () => {
         const sessionId = params.get('session_id'); // Also check for session_id from server-side flow
         const returnUrl = params.get('returnUrl'); // Get return URL from params
         
-        console.log('Processing payment success for user:', userId, 'session:', sessionId);
+        console.log('Processing payment success with params:', {
+          userId,
+          sessionId,
+          returnUrl
+        });
 
         if (!userId && !sessionId) {
-          toast({
-            title: "Error",
-            description: "Payment information is missing. Please try again.",
-            variant: "destructive",
-          });
-          setProcessing(false);
-          setSuccess(false);
+          console.error('Payment information missing - no userId or sessionId');
+          
+          // Try to get the current user as a fallback
+          const { user } = useAuthStore.getState();
+          if (user) {
+            console.log('Using current authenticated user as fallback:', user.uid);
+            // Update the user's premium status with the current user ID
+            await handleSuccessfulPayment(user.uid);
+            setIsPremium(true);
+            setSuccess(true);
+            setProcessing(false);
+            
+            toast({
+              title: "Premium Activated!",
+              description: "You now have access to all premium features.",
+            });
+          } else {
+            toast({
+              title: "Error",
+              description: "Payment information is missing. Please try again.",
+              variant: "destructive",
+            });
+            setProcessing(false);
+            setSuccess(false);
+          }
           return;
         }
 
@@ -41,6 +64,7 @@ const PaymentSuccessPage = () => {
         try {
           // If we have a userId, update premium status directly
           if (userId) {
+            console.log('Updating premium status for user ID:', userId);
             // Update the user's premium status
             await handleSuccessfulPayment(userId);
             
@@ -53,11 +77,25 @@ const PaymentSuccessPage = () => {
               description: "You now have access to all premium features.",
             });
             
+            // Force a premium status sync after a short delay to ensure updates propagate
+            setTimeout(() => {
+              console.log('Performing delayed premium status sync');
+              useUsageStore.getState().syncPremiumStatus();
+            }, 2000);
+            
             setSuccess(true);
             setProcessing(false);
           } 
           // If we only have sessionId but no userId, handle that case
           else if (sessionId) {
+            console.log('Handling session-only based success:', sessionId);
+            // Get current user
+            const { user } = useAuthStore.getState();
+            if (user) {
+              console.log('Using current user for session-based success:', user.uid);
+              await handleSuccessfulPayment(user.uid);
+            }
+            
             setIsPremium(true);
             setSuccess(true);
             setProcessing(false);
