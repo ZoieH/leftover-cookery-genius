@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { SubscriptionDetails, getSubscriptionDetails, cancelSubscription, reactivateSubscription } from '@/services/stripeService';
 import { getSavedRecipes } from '@/services/recipeService';
 import type { Recipe } from '@/types/recipe';
+import PaymentDebugInfo from '@/components/PaymentDebugInfo';
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -400,6 +401,9 @@ export default function UserPortalPage() {
                     </li>
                   </ul>
                 </div>
+                
+                {/* Payment Debug Information */}
+                <PaymentDebugInfo />
               </CardContent>
             </Card>
           </TabsContent>

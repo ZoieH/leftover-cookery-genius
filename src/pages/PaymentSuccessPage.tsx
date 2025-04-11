@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { CheckCircle, Loader2, AlertTriangle } from 'lucide-react';
+import { CheckCircle, Loader2, AlertTriangle, Bug, ClipboardCopy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import Layout from '@/components/Layout';
 import { handleSuccessfulPayment } from '@/services/stripeService';
 import { useUsageStore } from '@/services/usageService';
 import { useAuthStore } from '@/services/firebaseService';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 const PaymentSuccessPage = () => {
   const navigate = useNavigate();
@@ -17,6 +18,8 @@ const PaymentSuccessPage = () => {
   const [processing, setProcessing] = useState(true);
   const [success, setSuccess] = useState(false);
   const [warning, setWarning] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<Record<string, any>>({});
+  const [isDebugExpanded, setIsDebugExpanded] = useState(false);
 
   useEffect(() => {
     const processPayment = async () => {
@@ -28,7 +31,11 @@ const PaymentSuccessPage = () => {
         const nonce = params.get('nonce');
         const returnUrl = params.get('returnUrl');
         
-        console.log('Processing payment success:', { userId, sessionId, nonce });
+        // Collect debug info
+        const paymentInfo = { userId, sessionId, nonce, returnUrl };
+        
+        console.log('Processing payment success:', paymentInfo);
+        setDebugInfo(current => ({ ...current, paymentParams: paymentInfo }));
 
         // Validate required parameters
         if (!userId && !sessionId) {
@@ -50,6 +57,15 @@ const PaymentSuccessPage = () => {
         if (userId) {
           localStorage.setItem('pending_premium_user_id', userId);
         }
+
+        // Get initial state for debugging
+        const initialState = {
+          localStorage: collectLocalStorageItems(),
+          userObj: user ? { uid: user.uid, email: user.email } : null,
+          isPremium: useUsageStore.getState().isPremium
+        };
+        
+        setDebugInfo(current => ({ ...current, initialState }));
         
         try {
           // If we have a userId, update premium status in the database
@@ -57,9 +73,33 @@ const PaymentSuccessPage = () => {
             // First try to sync premium status if user is logged in to ensure we get the latest state
             if (user && user.uid === userId) {
               await syncPremiumStatus();
+              
+              // Log status after sync
+              const afterSyncState = {
+                isPremium: useUsageStore.getState().isPremium,
+                timestamp: new Date().toISOString()
+              };
+              
+              setDebugInfo(current => ({ 
+                ...current, 
+                afterSync: afterSyncState 
+              }));
             }
             
             const dbUpdateSuccess = await handleSuccessfulPayment(userId, nonce);
+            
+            // Log status after payment processing
+            const afterPaymentState = {
+              dbUpdateSuccess,
+              isPremium: useUsageStore.getState().isPremium,
+              localStorage: collectLocalStorageItems(),
+              timestamp: new Date().toISOString()
+            };
+            
+            setDebugInfo(current => ({ 
+              ...current, 
+              afterPayment: afterPaymentState 
+            }));
             
             if (!dbUpdateSuccess) {
               setWarning('Your premium status was activated, but we encountered an issue syncing with our server. Your access is still enabled, and we\'ll automatically retry the sync.');
@@ -69,6 +109,18 @@ const PaymentSuccessPage = () => {
             if (user && user.uid === userId) {
               setTimeout(async () => {
                 await syncPremiumStatus();
+                
+                // Log final state
+                const finalState = {
+                  isPremium: useUsageStore.getState().isPremium,
+                  localStorage: collectLocalStorageItems(),
+                  timestamp: new Date().toISOString()
+                };
+                
+                setDebugInfo(current => ({ 
+                  ...current, 
+                  finalState 
+                }));
               }, 1000); // Slight delay to allow database updates to propagate
             }
           } 
@@ -93,6 +145,16 @@ const PaymentSuccessPage = () => {
           if (userId) {
             localStorage.setItem('recovery_user_id', userId);
           }
+          
+          // Log error
+          setDebugInfo(current => ({ 
+            ...current, 
+            error: {
+              message: updateError instanceof Error ? updateError.message : String(updateError),
+              stack: updateError instanceof Error ? updateError.stack : null,
+              timestamp: new Date().toISOString()
+            }
+          }));
         }
         
         // Clear pending flags since we've handled the payment
@@ -133,11 +195,42 @@ const PaymentSuccessPage = () => {
         });
         setProcessing(false);
         setSuccess(false);
+        
+        // Log error
+        setDebugInfo(current => ({ 
+          ...current, 
+          error: {
+            message: error.message || String(error),
+            stack: error.stack,
+            timestamp: new Date().toISOString()
+          }
+        }));
       }
     };
 
     processPayment();
   }, [location.search, toast, setIsPremium, syncPremiumStatus, navigate, user]);
+
+  // Helper function to collect relevant localStorage items
+  const collectLocalStorageItems = () => {
+    const items: Record<string, string> = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.includes('premium') || key.includes('payment'))) {
+        items[key] = localStorage.getItem(key) || '';
+      }
+    }
+    return items;
+  };
+
+  // Helper to copy debug info to clipboard
+  const copyDebugInfo = () => {
+    navigator.clipboard.writeText(JSON.stringify(debugInfo, null, 2));
+    toast({
+      title: "Copied",
+      description: "Debug information copied to clipboard",
+    });
+  };
 
   return (
     <Layout>
@@ -194,6 +287,34 @@ const PaymentSuccessPage = () => {
               >
                 Return Now
               </Button>
+              
+              {/* Debug Info */}
+              <Collapsible 
+                open={isDebugExpanded} 
+                onOpenChange={setIsDebugExpanded}
+                className="mt-4 border-t pt-4"
+              >
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-1">
+                    <Bug className="h-3 w-3" />
+                    <span>Debug Info</span>
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="text-left mt-2">
+                    <div className="flex justify-between mb-2">
+                      <span className="text-sm font-medium">Payment Status Details</span>
+                      <Button variant="ghost" size="sm" onClick={copyDebugInfo} className="h-6 gap-1">
+                        <ClipboardCopy className="h-3 w-3" />
+                        <span className="text-xs">Copy</span>
+                      </Button>
+                    </div>
+                    <div className="bg-muted p-2 rounded text-xs font-mono max-h-60 overflow-auto">
+                      <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
+                    </div>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             </>
           ) : (
             <>
@@ -217,6 +338,34 @@ const PaymentSuccessPage = () => {
                   Return Home
                 </Button>
               </div>
+              
+              {/* Debug Info for Errors */}
+              <Collapsible 
+                open={isDebugExpanded} 
+                onOpenChange={setIsDebugExpanded}
+                className="mt-4 border-t pt-4"
+              >
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-1">
+                    <Bug className="h-3 w-3" />
+                    <span>Debug Info</span>
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="text-left mt-2">
+                    <div className="flex justify-between mb-2">
+                      <span className="text-sm font-medium">Error Details</span>
+                      <Button variant="ghost" size="sm" onClick={copyDebugInfo} className="h-6 gap-1">
+                        <ClipboardCopy className="h-3 w-3" />
+                        <span className="text-xs">Copy</span>
+                      </Button>
+                    </div>
+                    <div className="bg-muted p-2 rounded text-xs font-mono max-h-60 overflow-auto">
+                      <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
+                    </div>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             </>
           )}
         </div>
