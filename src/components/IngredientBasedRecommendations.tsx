@@ -65,11 +65,11 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
   const loadRecommendations = async (showToast: boolean = false, forceFresh: boolean = false) => {
     if (ingredients.length === 0) {
       if (showToast) {
-        toast({
-          title: "No Ingredients",
-          description: "Please add ingredients to get recipe recommendations.",
-          variant: "destructive",
-        });
+      toast({
+        title: "No Ingredients",
+        description: "Please add ingredients to get recipe recommendations.",
+        variant: "destructive",
+      });
       }
       return;
     }
@@ -219,11 +219,11 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
     } catch (error) {
       console.error("Error getting recipe recommendations:", error);
       if (showToast) {
-        toast({
-          title: "Recommendation Error",
+      toast({
+        title: "Recommendation Error",
           description: "Failed to fetch recipe recommendations. Please try again later.",
-          variant: "destructive",
-        });
+        variant: "destructive",
+      });
       }
       setRecommendations([]);
       setAlternativeRecipes([]);
@@ -350,15 +350,15 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-medium">Recipe Recommendations</h3>
-        <Button
-          variant="outline"
-          size="sm"
+          <Button 
+            variant="outline" 
+            size="sm" 
           onClick={handleRefresh}
-          disabled={isLoading}
-        >
+            disabled={isLoading}
+          >
           <Search className="h-4 w-4 mr-2" />
           Refresh Results
-        </Button>
+          </Button>
       </div>
 
       {isLoading ? (
@@ -373,12 +373,12 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
           {/* No recommendations message */}
           {recommendations.length === 0 && ingredients.length > 0 && (
             <div className="text-center p-8 border rounded-lg bg-muted/30 mb-6">
-              <p className="text-sm text-muted-foreground mb-2">
+          <p className="text-sm text-muted-foreground mb-2">
                 No exact recipe matches found
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Try adding more ingredients or adjusting your filters
-              </p>
+          </p>
+            <p className="text-xs text-muted-foreground">
+              Try adding more ingredients or adjusting your filters
+            </p>
             </div>
           )}
           
@@ -388,17 +388,17 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
               <p className="text-sm text-muted-foreground mb-2">
                 Add ingredients to get recipe recommendations
               </p>
-            </div>
+        </div>
           )}
           
           {/* Main recommendations */}
           {recommendations.length > 0 && (
             <div className="space-y-4 mb-8">
-              {recommendations.map((recipe) => {
-                const coverage = calculateIngredientCoverage(recipe, ingredients);
+          {recommendations.map((recipe) => {
+            const coverage = calculateIngredientCoverage(recipe, ingredients);
                 const isExpanded = expandedRecipeId === String(recipe.id);
-                
-                return (
+            
+            return (
                   <Card key={recipe.id} className={cn(
                     "transition-all duration-200",
                     isExpanded && "ring-2 ring-primary"
@@ -442,14 +442,14 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
                             {recipe.dietaryTags.map((tag) => (
                               <Badge key={tag} variant="secondary">
                                 {tag}
-                              </Badge>
+                        </Badge>
                             ))}
                           </div>
                           
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                             <div className="flex items-center gap-2">
                               <Clock className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                              <span>{recipe.prepTime} + {recipe.cookTime}</span>
+                            <span>{recipe.prepTime} + {recipe.cookTime}</span>
                             </div>
                             <div className="flex items-center gap-2">
                               <User className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
@@ -483,7 +483,7 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
                         )}
                       </div>
                       <div className="flex items-center gap-2">
-                        <Button
+                      <Button
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8"
@@ -505,17 +505,17 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
                           <span className="sr-only">
                             {savedRecipes[String(recipe.id)] ? "Unsave Recipe" : "Save Recipe"}
                           </span>
-                        </Button>
-                        {onSelectRecipe && (
-                          <Button
-                            size="sm"
+                      </Button>
+                      {onSelectRecipe && (
+                        <Button 
+                          size="sm"
                             className="w-full sm:w-auto"
-                            onClick={() => onSelectRecipe(recipe)}
-                          >
-                            Select Recipe
-                          </Button>
-                        )}
-                      </div>
+                          onClick={() => onSelectRecipe(recipe)}
+                        >
+                          Select Recipe
+                        </Button>
+                      )}
+                    </div>
                     </CardFooter>
                   </Card>
                 );
@@ -552,14 +552,14 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
                                   target.style.display = 'none';
                                 }}
                               />
-                            </div>
+                  </div>
                           )}
                           <div className="flex-1 space-y-1">
                             <CardTitle className="text-xl sm:text-2xl">{recipe.title}</CardTitle>
                             <CardDescription className="mt-1 text-sm">
                               {isExpanded ? recipe.description : truncateDescription(recipe.description)}
                             </CardDescription>
-                          </div>
+                </div>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -568,7 +568,7 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
                           >
                             {isExpanded ? "Show Less" : "Show More"}
                           </Button>
-                        </div>
+                      </div>
                       </CardHeader>
                       
                       {isExpanded && (
@@ -599,11 +599,11 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
                                 {recipe.ingredients.map((ingredient, index) => (
                                   <li key={index} className="text-sm">
                                     {ingredient}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          </div>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
                         </CardContent>
                       )}
                       
@@ -617,7 +617,7 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
                               ({findMissingIngredients(recipe, ingredients).length} ingredients missing)
                             </span>
                           )}
-                        </div>
+                    </div>
                         <div className="flex items-center gap-2">
                           <Button
                             variant="ghost"
@@ -651,29 +651,14 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
                               Select Recipe
                             </Button>
                           )}
-                        </div>
+                  </div>
                       </CardFooter>
-                    </Card>
-                  );
-                })}
+              </Card>
+            );
+          })}
               </div>
             </div>
           )}
-          
-          {/* Add debug information here */}
-          <div className="bg-yellow-100 p-4 rounded mb-4">
-            <p>Debug: Alternative recipes count: {alternativeRecipes.length}</p>
-            {alternativeRecipes.length > 0 && (
-              <div>
-                <p>Debug: Alternative recipe titles:</p>
-                <ul>
-                  {alternativeRecipes.map((recipe, index) => (
-                    <li key={index}>{recipe.title}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
         </div>
       )}
       <AuthModal 
