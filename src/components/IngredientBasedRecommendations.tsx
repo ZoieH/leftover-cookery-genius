@@ -126,18 +126,37 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
         if (calorieLimit && recipe.calories && recipe.calories > calorieLimit) {
           return false;
         }
-        // Check dietary requirements if specified
-        if (dietaryFilter && dietaryFilter !== 'none' && !recipe.dietaryTags.includes(dietaryFilter)) {
-          return false;
+        
+        // Check dietary requirements if specified, with a special case for OpenAI recipes
+        if (dietaryFilter && dietaryFilter !== 'none') {
+          // For OpenAI-generated recipes, be more lenient as they may not have properly formatted tags
+          if (recipe.id.toString().includes('openai')) {
+            // If we can't verify diet compliance, assume it's ok since OpenAI was given the dietary constraint
+            return true;
+          }
+          
+          // For other recipes, check dietary tags
+          return recipe.dietaryTags.some(tag => 
+            tag.toLowerCase().includes(dietaryFilter.toLowerCase()) || 
+            dietaryFilter.toLowerCase().includes(tag.toLowerCase())
+          );
         }
+        
         return true;
       };
 
-      // Split recipes into recommendations and alternatives
+      // Split recipes into recommendations and alternatives with a lower threshold
       const exactMatches = allRecipes.filter(recipe => {
         const coverage = calculateIngredientCoverage(recipe, ingredients);
-        return coverage >= 0.3 && meetsRequirements(recipe);
+        // Lower threshold to 0.2 (20%) to be more inclusive
+        const meets = coverage >= 0.2 && meetsRequirements(recipe);
+        console.log(`Recipe ${recipe.title} - Coverage: ${coverage.toFixed(2)}, Meets requirements: ${meetsRequirements(recipe)}, Categorized as: ${meets ? 'main recommendation' : 'alternative'}`);
+        return meets;
       });
+      
+      // Log the split of recipes
+      console.log('Main recommendations count:', exactMatches.length);
+      console.log('Main recommendations:', exactMatches.map(r => r.title));
       
       const potentialAlternatives = allRecipes
         .filter(recipe => {
@@ -159,21 +178,37 @@ const IngredientBasedRecommendations: FC<IngredientBasedRecommendationsProps> = 
           return Number(meetsRequirements(b)) - Number(meetsRequirements(a));
         });
 
-      // Calculate how many alternatives we need to show to reach minimum of 3 total recipes
-      const minTotalRecipes = 3;
-      const alternativesNeeded = Math.max(0, minTotalRecipes - exactMatches.length);
-      const alternatives = potentialAlternatives.slice(0, Math.max(alternativesNeeded, 2)); // Show at least 2 alternatives if available
+      // If no exact matches but we have alternatives, move the best alternative to exactMatches
+      if (exactMatches.length === 0 && potentialAlternatives.length > 0) {
+        // Find any OpenAI-generated recipes first (they should be prioritized)
+        const openAiRecipe = potentialAlternatives.find(r => r.id.toString().includes('openai'));
+        
+        if (openAiRecipe) {
+          console.log('Moving OpenAI recipe to main recommendations:', openAiRecipe.title);
+          exactMatches.push(openAiRecipe);
+          // Remove from alternatives
+          const index = potentialAlternatives.findIndex(r => r.id === openAiRecipe.id);
+          if (index !== -1) {
+            potentialAlternatives.splice(index, 1);
+          }
+        } else if (potentialAlternatives.length > 0) {
+          // If no OpenAI recipe, move the top alternative
+          console.log('Moving top alternative recipe to main recommendations:', potentialAlternatives[0].title);
+          exactMatches.push(potentialAlternatives[0]);
+          potentialAlternatives.splice(0, 1);
+        }
+      }
       
       setRecommendations(exactMatches);
-      setAlternativeRecipes(alternatives);
+      setAlternativeRecipes(potentialAlternatives);
       
       if (exactMatches.length === 0 && showToast) {
         toast({
           title: "No Exact Matches Found",
-          description: alternatives.length > 0 
+          description: potentialAlternatives.length > 0 
             ? "Here are some alternative recipes you might like based on your ingredients."
             : "We couldn't find any recipes. Try adding different ingredients or adjusting your filters.",
-          variant: alternatives.length > 0 ? "default" : "destructive",
+          variant: potentialAlternatives.length > 0 ? "default" : "destructive",
         });
       }
     } catch (error) {

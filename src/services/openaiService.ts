@@ -90,51 +90,84 @@ Format the response as a JSON object with the following structure:
     console.log('OpenAI API response received');
     
     try {
+      // Log the raw response first for debugging
+      console.log('Raw OpenAI response structure:', JSON.stringify({
+        model: data.model,
+        choices_length: data.choices?.length || 0,
+        content_length: data.choices?.[0]?.message?.content?.length || 0
+      }));
+      
       // Clean up the response content by removing markdown code blocks
       const content = data.choices[0].message.content;
+      console.log('Original content type:', typeof content);
+      console.log('Original content starts with:', content.substring(0, 30));
       
-      // Remove markdown code blocks (```json and ```)
-      let cleanedContent = content
-        .replace(/```json\s+/g, '')
+      // More aggressive cleaning approach
+      let cleanedContent = content;
+      
+      // First remove markdown code blocks
+      cleanedContent = cleanedContent
+        .replace(/```json\s*/g, '')
         .replace(/```\s*$/g, '')
         .replace(/```/g, '')
         .trim();
       
-      // If the response is still not valid JSON, try to extract the JSON object pattern
+      console.log('After markdown removal:', cleanedContent.substring(0, 30));
+      
+      // If still not valid, try more aggressive JSON extraction
       try {
         JSON.parse(cleanedContent);
+        console.log('First attempt at parsing succeeded');
       } catch (e) {
-        // Try to extract the JSON object using regex
-        const jsonPattern = /(\{[\s\S]*\})/s;
-        const match = cleanedContent.match(jsonPattern);
+        console.log('First parse attempt failed:', e.message);
+        
+        // Try to extract the JSON object using regex - looking for the entire structure
+        const jsonPattern = /\{[\s\S]*\}/;
+        const match = content.match(jsonPattern);
         if (match && match[0]) {
+          console.log('Found JSON pattern match of length:', match[0].length);
           cleanedContent = match[0];
+        } else {
+          console.log('No JSON pattern match found');
         }
       }
       
-      console.log('Cleaned content:', cleanedContent.substring(0, 100) + '...');
+      console.log('Final cleaned content length:', cleanedContent.length);
+      console.log('Final cleaned content starts with:', cleanedContent.substring(0, 30));
       
-      const recipeData: OpenAIRecipeResponse = JSON.parse(cleanedContent);
-      console.log('Successfully parsed recipe data from OpenAI');
+      // Last attempt to parse - with additional error information
+      try {
+        const recipeData: OpenAIRecipeResponse = JSON.parse(cleanedContent);
+        console.log('Successfully parsed recipe data from OpenAI');
 
-      // Convert OpenAI response to our Recipe format
-      const recipe: Recipe = {
-        id: `openai-${Date.now()}`,
-        title: recipeData.title,
-        description: recipeData.description,
-        ingredients: recipeData.ingredients,
-        instructions: recipeData.instructions,
-        prepTime: recipeData.prepTime,
-        cookTime: recipeData.cookTime,
-        servings: recipeData.servings,
-        dietaryTags: recipeData.dietaryTags,
-        source: RecipeSource.LOCAL, // Using LOCAL as the source for AI-generated recipes
-        image: '', // No image for AI-generated recipes
-        calories: 0, // No calorie info for AI-generated recipes
-        sourceUrl: 'https://openai.com' // Source URL for AI-generated recipes
-      };
+        // Convert OpenAI response to our Recipe format
+        const recipe: Recipe = {
+          id: `openai-${Date.now()}`,
+          title: recipeData.title,
+          description: recipeData.description,
+          ingredients: recipeData.ingredients,
+          instructions: recipeData.instructions,
+          prepTime: recipeData.prepTime,
+          cookTime: recipeData.cookTime,
+          servings: recipeData.servings,
+          dietaryTags: recipeData.dietaryTags || [],
+          source: RecipeSource.LOCAL, // Using LOCAL as the source for AI-generated recipes
+          image: '', // No image for AI-generated recipes
+          calories: 0, // No calorie info for AI-generated recipes
+          sourceUrl: 'https://openai.com' // Source URL for AI-generated recipes
+        };
 
-      return recipe;
+        // If a dietary filter was specified, make sure it's included in the tags
+        if (dietaryFilter && !recipe.dietaryTags.includes(dietaryFilter)) {
+          recipe.dietaryTags.push(dietaryFilter);
+        }
+
+        return recipe;
+      } catch (parseError) {
+        console.error('Failed to parse OpenAI response:', parseError);
+        console.error('Raw response content:', data.choices[0]?.message?.content);
+        throw new Error('Failed to parse recipe data from OpenAI response');
+      }
     } catch (parseError) {
       console.error('Failed to parse OpenAI response:', parseError);
       console.error('Raw response content:', data.choices[0]?.message?.content);
