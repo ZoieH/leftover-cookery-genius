@@ -28,6 +28,8 @@ function countMatchingIngredients(recipe: Recipe, userIngredients: string[]): nu
  * 1. First searches our own database
  * 2. If no matches, tries Spoonacular API
  * 3. If still no matches, generates a recipe using OpenAI
+ * 
+ * Returns a maximum of 3 recipes total, combined from all sources.
  */
 export const recommendRecipesFromIngredients = async (
   ingredients: string[],
@@ -35,15 +37,19 @@ export const recommendRecipesFromIngredients = async (
   options: RecommendationOptions = {}
 ): Promise<Recipe[]> => {
   const {
-    maxResults = 10
+    maxResults = 3 // Changed default to 3
   } = options;
+
+  // Track how many recipes we've collected so far
+  let collectedRecipes: Recipe[] = [];
+  let remainingCount = maxResults;
 
   try {
     // Layer 1: Search our own database
     const localRecipes = await searchRecipes({
       ingredients,
       dietaryPreference: dietaryFilter,
-      maxResults: maxResults
+      maxResults: remainingCount // Only request what we still need
     });
 
     // Sort local recipes by coverage
@@ -54,8 +60,15 @@ export const recommendRecipesFromIngredients = async (
         return coverageB - coverageA;
       });
 
-    if (sortedLocalRecipes.length > 0) {
-      return sortedLocalRecipes.slice(0, maxResults);
+    // Add local recipes to our collection
+    collectedRecipes = [...collectedRecipes, ...sortedLocalRecipes.slice(0, remainingCount)];
+    remainingCount = maxResults - collectedRecipes.length;
+
+    console.log(`📊 [RECIPE-SERVICE] Local recipes added: ${sortedLocalRecipes.length > 0 ? sortedLocalRecipes.slice(0, remainingCount + sortedLocalRecipes.length).length : 0}, remaining slots: ${remainingCount}`);
+    
+    // If we've reached our max, return early
+    if (remainingCount <= 0) {
+      return collectedRecipes;
     }
 
     // Layer 2: Try Spoonacular API
@@ -72,36 +85,49 @@ export const recommendRecipesFromIngredients = async (
           return coverageB - coverageA;
         });
 
-      console.log('📊 [RECIPE-SERVICE] Sorted Spoonacular recipes:', sortedSpoonacularRecipes.length);
+      // Add Spoonacular recipes to our collection, but only up to remaining count
+      collectedRecipes = [...collectedRecipes, ...sortedSpoonacularRecipes.slice(0, remainingCount)];
+      remainingCount = maxResults - collectedRecipes.length;
 
-      if (sortedSpoonacularRecipes.length > 0) {
-        return sortedSpoonacularRecipes.slice(0, maxResults);
+      console.log(`📊 [RECIPE-SERVICE] Spoonacular recipes added: ${sortedSpoonacularRecipes.length > 0 ? sortedSpoonacularRecipes.slice(0, remainingCount + sortedSpoonacularRecipes.length).length : 0}, remaining slots: ${remainingCount}`);
+
+      // If we've reached our max, return early
+      if (remainingCount <= 0) {
+        return collectedRecipes;
       }
-      console.log('⚠️ [RECIPE-SERVICE] No Spoonacular recipes found, trying ChatGPT...');
+
+      // If we had no Spoonacular recipes, log it
+      if (sortedSpoonacularRecipes.length === 0) {
+        console.log('⚠️ [RECIPE-SERVICE] No Spoonacular recipes found, trying ChatGPT...');
+      }
     } catch (error) {
       console.warn('Spoonacular API error:', error);
       console.log('Spoonacular API failed, falling back to ChatGPT...');
     }
 
-    // Layer 3: Generate recipe using OpenAI
-    try {
-      console.log('Attempting to generate recipe with ChatGPT...');
-      const aiRecipe = await generateRecipeWithOpenAI(ingredients, dietaryFilter);
-      if (aiRecipe) {
-        console.log('Successfully generated recipe with ChatGPT');
-        return [aiRecipe];
+    // Layer 3: Generate recipe using OpenAI (only if we still need more recipes)
+    if (remainingCount > 0) {
+      try {
+        console.log('Attempting to generate recipe with ChatGPT...');
+        const aiRecipe = await generateRecipeWithOpenAI(ingredients, dietaryFilter);
+        if (aiRecipe) {
+          console.log('Successfully generated recipe with ChatGPT');
+          collectedRecipes = [...collectedRecipes, aiRecipe];
+          // No need to update remainingCount since we're done after this
+        } else {
+          console.error('ChatGPT failed to generate a recipe');
+        }
+      } catch (error) {
+        console.error('Error generating recipe with ChatGPT:', error);
       }
-      console.error('ChatGPT failed to generate a recipe');
-    } catch (error) {
-      console.error('Error generating recipe with ChatGPT:', error);
     }
 
-    // If all layers fail, return empty array
-    console.log('All recipe sources failed, returning empty array');
-    return [];
+    // Return all collected recipes (max of maxResults)
+    console.log(`📊 [RECIPE-SERVICE] Total recipes collected: ${collectedRecipes.length}`);
+    return collectedRecipes;
 
   } catch (error) {
     console.error('Error recommending recipes:', error);
-    return [];
+    return collectedRecipes.length > 0 ? collectedRecipes : []; // Return what we have, even if there was an error
   }
 }; 
