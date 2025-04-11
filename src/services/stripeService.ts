@@ -138,29 +138,48 @@ export const createCheckoutSession = async (userId: string, email: string) => {
 
 export const handleSuccessfulPayment = async (userId: string) => {
   try {
+    console.log('Updating premium status for user:', userId);
     const userDocRef = doc(db, 'users', userId);
-    const userDoc = await getDoc(userDocRef);
     
+    // Enhanced premium data with Stripe information
     const premiumData = {
       isPremium: true,
       premiumSince: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      subscriptionStatus: 'active'
+      subscriptionStatus: 'active',
+      paymentSource: 'stripe',
+      subscriptionType: 'monthly'
     };
     
+    // Get the current user document
+    const userDoc = await getDoc(userDocRef);
+    
     if (!userDoc.exists()) {
+      console.log('User document not found, creating new document');
+      // Create a new user document if it doesn't exist
       await setDoc(userDocRef, {
         uid: userId,
         ...premiumData,
         createdAt: new Date().toISOString()
       });
+      console.log('Created new user document with premium status');
     } else {
+      console.log('User document exists, updating premium status');
+      // Update the existing user document
       await updateDoc(userDocRef, premiumData);
+      console.log('Updated user document with premium status');
     }
     
-    // Update local state as a fallback
+    // Double-check the update was successful
+    const updatedDoc = await getDoc(userDocRef);
+    console.log('Updated user data:', updatedDoc.data());
+    
+    // Always update local storage for client-side detection
     localStorage.setItem('isPremium', 'true');
     localStorage.setItem('premiumSince', new Date().toISOString());
+    console.log('Updated localStorage with premium status');
+    
+    return true;
   } catch (error) {
     console.error('Error updating premium status:', error);
     // Always ensure user gets premium access by updating local storage

@@ -85,18 +85,21 @@ const PaymentSuccessPage = () => {
         let redirectUrl = '/';
         if (returnUrl) {
           redirectUrl = decodeURIComponent(returnUrl);
+          console.log('Using returnUrl from params:', redirectUrl);
         } else {
           const storedReturnUrl = localStorage.getItem('payment_return_url');
           if (storedReturnUrl) {
             redirectUrl = storedReturnUrl;
+            console.log('Using returnUrl from localStorage:', redirectUrl);
             localStorage.removeItem('payment_return_url'); // Clean up
+          } else {
+            console.log('No return URL found, using default: /');
           }
         }
         
-        // Auto-redirect after 2 seconds
-        setTimeout(() => {
-          navigate(redirectUrl);
-        }, 2000);
+        // Redirect immediately
+        console.log('Redirecting to:', redirectUrl);
+        navigate(redirectUrl);
       } catch (error: any) {
         console.error('Error processing payment:', error);
         toast({
