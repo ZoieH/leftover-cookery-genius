@@ -1,10 +1,12 @@
 import { loadStripe } from '@stripe/stripe-js';
 import { getFirestore, collection, addDoc, updateDoc, query, where, getDocs, doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
-import { db, auth } from './firebaseService';
+import { getAuth } from 'firebase/auth';
+import { db } from './firebaseService';
 import { useUsageStore } from './usageService';
 
 // Initialize Stripe
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+const auth = getAuth();
 
 // Price ID for the premium subscription
 const PREMIUM_PRICE_ID = import.meta.env.VITE_STRIPE_PREMIUM_PRICE_ID;
@@ -109,56 +111,30 @@ export const reactivateSubscription = async (userId: string): Promise<boolean> =
 
 export const createCheckoutSession = async (userId: string, email: string) => {
   try {
-    console.log('Creating checkout session for user:', userId);
-    
-    // Instead of using the Payment Link which is causing errors,
-    // let's create a checkout session directly with the Stripe API
-    
-    // First, get the Stripe instance
-    const stripe = await stripePromise;
-    if (!stripe) {
-      throw new Error('Failed to initialize Stripe');
-    }
+    // Use the Stripe Payment Link with coupon support
+    const paymentLinkUrl = "https://buy.stripe.com/cN26rbbQG1Ylb7y8ww";
     
     // Store current page path for returning after payment
     const currentPage = window.location.pathname;
     localStorage.setItem('payment_return_url', currentPage);
     
-    // Create properly formatted and encoded URLs for success and cancel
-    const origin = window.location.origin;
-    const successUrl = new URL(`${origin}/payment-success`);
-    successUrl.searchParams.append('user', userId);
-    successUrl.searchParams.append('success', 'true');
-    successUrl.searchParams.append('returnUrl', currentPage);
+    // Add client reference ID and prefilled email to the URL
+    const urlWithParams = new URL(paymentLinkUrl);
+    urlWithParams.searchParams.append("client_reference_id", userId);
+    urlWithParams.searchParams.append("prefilled_email", email);
     
-    const cancelUrl = new URL(`${origin}/payment-canceled`);
-    cancelUrl.searchParams.append('returnUrl', currentPage);
+    // Add success and cancel URL parameters with proper encoding
+    const successUrl = `${window.location.origin}/payment-success?user=${encodeURIComponent(userId)}&success=true&returnUrl=${encodeURIComponent(currentPage)}`;
+    const cancelUrl = `${window.location.origin}/payment-canceled?returnUrl=${encodeURIComponent(currentPage)}`;
     
-    console.log('Success URL:', successUrl.toString());
-    console.log('Cancel URL:', cancelUrl.toString());
+    urlWithParams.searchParams.append("success_url", successUrl);
+    urlWithParams.searchParams.append("cancel_url", cancelUrl);
     
-    // Create the checkout session
-    const { error } = await stripe.redirectToCheckout({
-      mode: 'subscription',
-      lineItems: [
-        {
-          price: PREMIUM_PRICE_ID,
-          quantity: 1,
-        },
-      ],
-      successUrl: successUrl.toString(),
-      cancelUrl: cancelUrl.toString(),
-      clientReferenceId: userId,
-      customerEmail: email,
-    });
-    
-    if (error) {
-      console.error('Stripe checkout error:', error);
-      throw new Error(error.message || 'Payment processing error. Please try again.');
-    }
+    // Redirect to the payment link
+    window.location.href = urlWithParams.toString();
     
   } catch (error) {
-    console.error('Error creating checkout session:', error);
+    console.error('Error redirecting to checkout:', error);
     throw new Error('Payment processing error. Please try again or contact support.');
   }
 };
@@ -166,8 +142,6 @@ export const createCheckoutSession = async (userId: string, email: string) => {
 export const handleSuccessfulPayment = async (userId: string) => {
   try {
     console.log('Updating premium status for user:', userId);
-    
-    // Update both Firebase and local storage to ensure premium status persists
     const userDocRef = doc(db, 'users', userId);
     
     // Enhanced premium data with Stripe information
@@ -225,29 +199,15 @@ export const handleSuccessfulPayment = async (userId: string) => {
     }
     
     // Always update local storage for client-side detection
-    console.log('Updating localStorage with premium status');
     localStorage.setItem('isPremium', 'true');
     localStorage.setItem('premiumSince', premiumData.premiumSince);
     localStorage.setItem('premiumUserId', userId); // Store the user ID for cross-referencing
+    console.log('Updated localStorage with premium status');
     
-    // Force sync with the server once more to confirm the update
-    console.log('Forcing sync with server for final confirmation');
-    try {
-      const currentUser = auth.currentUser;
-      if (currentUser && currentUser.uid === userId) {
-        // This will update the global state as well
-        await useUsageStore.getState().syncPremiumStatus();
-      } else {
-        // Update the usage store state directly if we can't sync
-        useUsageStore.getState().setIsPremium(true);
-      }
-    } catch (syncError) {
-      console.error('Error during final sync:', syncError);
-      // Still set premium in the store even if sync fails
-      useUsageStore.getState().setIsPremium(true);
-    }
+    // Update the usage store state
+    useUsageStore.getState().setIsPremium(true);
+    console.log('Updated usage store state with premium status');
     
-    console.log('Premium status update complete');
     return true;
   } catch (error) {
     console.error('Error updating premium status:', error);
@@ -255,10 +215,6 @@ export const handleSuccessfulPayment = async (userId: string) => {
     localStorage.setItem('isPremium', 'true');
     localStorage.setItem('premiumSince', new Date().toISOString());
     localStorage.setItem('premiumUserId', userId);
-    
-    // Update the store state
-    useUsageStore.getState().setIsPremium(true);
-    
     throw error;
   }
 }; 
