@@ -160,10 +160,6 @@ const UpgradePage = () => {
                   </li>
                 ))}
               </ul>
-              <div className="mt-4 p-2 bg-muted rounded-md text-sm">
-                <span className="font-medium">Promotion Code: </span>
-                Use code <span className="font-bold text-primary">ZOIEFRIEND</span> for your first month free!
-              </div>
             </CardContent>
             <CardFooter>
               <Button 
