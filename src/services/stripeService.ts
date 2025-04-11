@@ -1,7 +1,11 @@
 import { loadStripe } from '@stripe/stripe-js';
 import { getFirestore, collection, addDoc, updateDoc, query, where, getDocs, doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
-import { db, auth } from './firebaseService';
+import { db, useAuthStore } from './firebaseService';
+import { getAuth } from 'firebase/auth';
 import { useUsageStore } from './usageService';
+
+// Initialize auth
+const auth = getAuth();
 
 // Initialize Stripe
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
