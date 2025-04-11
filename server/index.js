@@ -209,6 +209,22 @@ app.all('/api/create-checkout-session', (req, res, next) => {
   }
 });
 
+// Add a simple status endpoint to check server health
+app.get('/api/status', (req, res) => {
+  const status = {
+    server: 'online',
+    timestamp: new Date().toISOString(),
+    stripe: !!process.env.STRIPE_SECRET_KEY,
+    firebase: {
+      projectId: process.env.FIREBASE_PROJECT_ID || 'not-configured',
+      adminInitialized: !!admin.apps.length
+    },
+    environment: process.env.NODE_ENV || 'development'
+  };
+  
+  res.json(status);
+});
+
 // Create checkout session endpoint
 app.post('/api/create-checkout-session', async (req, res) => {
   try {
@@ -218,6 +234,16 @@ app.post('/api/create-checkout-session', async (req, res) => {
       method: req.method,
       path: req.path,
       headers: req.headers['content-type']
+    });
+    
+    // Check environment variables
+    console.log('Environment variables check:', {
+      stripe_key_length: process.env.STRIPE_SECRET_KEY ? process.env.STRIPE_SECRET_KEY.length : 0,
+      price_id_exists: !!process.env.VITE_STRIPE_PREMIUM_PRICE_ID,
+      frontend_url: process.env.FRONTEND_URL,
+      firebase_project: process.env.FIREBASE_PROJECT_ID,
+      firebase_email_exists: !!process.env.FIREBASE_CLIENT_EMAIL,
+      firebase_key_length: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.length : 0
     });
     
     const { userId, email } = req.body;
@@ -232,7 +258,13 @@ app.post('/api/create-checkout-session', async (req, res) => {
     
     // Check if user already has a customer ID in Firestore
     try {
+      if (!admin.apps.length) {
+        console.error('Firebase Admin not initialized');
+        throw new Error('Firebase Admin not initialized');
+      }
+      
       const db = admin.firestore();
+      console.log('Firestore connected, checking user doc');
       const userDoc = await db.collection('users').doc(userId).get();
       
       if (userDoc.exists && userDoc.data().stripeCustomerId) {
@@ -300,11 +332,28 @@ app.post('/api/create-checkout-session', async (req, res) => {
     res.json({ url: session.url });
   } catch (error) {
     console.error('Error creating checkout session:', error);
+    
+    // Extract relevant error details for diagnosis
+    const errorDetails = {
+      message: error.message,
+      name: error.name,
+      stack: process.env.NODE_ENV === 'production' ? undefined : error.stack,
+      stripeError: error.type ? {
+        type: error.type,
+        code: error.code,
+        param: error.param
+      } : undefined
+    };
+    
+    console.error('Error details:', JSON.stringify(errorDetails));
+    
     res.status(500).json({ 
       error: 'Failed to create checkout session',
       message: process.env.NODE_ENV === 'production' 
         ? 'An error occurred while processing your request' 
-        : error.message
+        : error.message,
+      // Only include debug info if not in production
+      debug: process.env.NODE_ENV !== 'production' ? errorDetails : undefined
     });
   }
 });
