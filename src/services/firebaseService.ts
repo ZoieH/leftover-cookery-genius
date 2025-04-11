@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, getDocs, addDoc, query, where, updateDoc, doc, getDoc, setDoc } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, addDoc, query, where, updateDoc, doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import type { LocalRecipe, RecipeSearchParams, Recipe } from '@/types/recipe';
 import { RecipeSource } from '@/types/recipe';
 import { 
@@ -311,4 +311,64 @@ export const upgradeToPremium = async (user: User | null): Promise<{ success: bo
     console.error('Error upgrading to premium:', error);
     return { success: false, error: error.message };
   }
-}; 
+};
+
+/**
+ * Get a specific recipe by ID
+ */
+export async function getRecipeById(recipeId: string): Promise<LocalRecipe | null> {
+  try {
+    const docRef = doc(db, 'recipes', recipeId);
+    const docSnap = await getDoc(docRef);
+    
+    if (!docSnap.exists()) {
+      return null;
+    }
+    
+    const data = docSnap.data();
+    return {
+      id: docSnap.id,
+      title: data.title,
+      description: data.description,
+      ingredients: data.ingredients,
+      image: data.image,
+      prepTime: data.prepTime,
+      cookTime: data.cookTime,
+      servings: data.servings,
+      dietaryTags: data.dietaryTags || [],
+      instructions: data.instructions,
+      source: 'LOCAL' as const
+    } as LocalRecipe;
+  } catch (error) {
+    console.error('Error getting recipe:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update an existing recipe in Firestore
+ */
+export async function updateRecipe(recipeId: string, recipeData: Partial<Recipe>): Promise<boolean> {
+  try {
+    const docRef = doc(db, 'recipes', recipeId);
+    await updateDoc(docRef, recipeData);
+    return true;
+  } catch (error) {
+    console.error('Error updating recipe:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete a recipe from Firestore
+ */
+export async function deleteRecipe(recipeId: string): Promise<boolean> {
+  try {
+    const docRef = doc(db, 'recipes', recipeId);
+    await deleteDoc(docRef);
+    return true;
+  } catch (error) {
+    console.error('Error deleting recipe:', error);
+    throw error;
+  }
+} 
