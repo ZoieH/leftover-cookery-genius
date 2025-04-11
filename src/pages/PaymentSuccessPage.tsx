@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { CheckCircle, Loader2, AlertTriangle, Bug, ClipboardCopy } from 'lucide-react';
+import { CheckCircle, Loader2, AlertTriangle, Bug, ClipboardCopy, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import Layout from '@/components/Layout';
@@ -8,6 +8,7 @@ import { handleSuccessfulPayment } from '@/services/stripeService';
 import { useUsageStore } from '@/services/usageService';
 import { useAuthStore } from '@/services/firebaseService';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { getFirestore, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 
 const PaymentSuccessPage = () => {
   const navigate = useNavigate();
@@ -20,6 +21,8 @@ const PaymentSuccessPage = () => {
   const [warning, setWarning] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<Record<string, any>>({});
   const [isDebugExpanded, setIsDebugExpanded] = useState(false);
+  const [isForcing, setIsForcing] = useState(false);
+  const db = getFirestore();
 
   useEffect(() => {
     const processPayment = async () => {
@@ -232,6 +235,99 @@ const PaymentSuccessPage = () => {
     });
   };
 
+  // Force premium status update directly in Firebase
+  const forceUpdatePremiumStatus = async () => {
+    const params = new URLSearchParams(location.search);
+    const userId = params.get('user') || user?.uid;
+    
+    if (!userId) {
+      toast({
+        title: "Error",
+        description: "No user ID found to update premium status",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsForcing(true);
+    try {
+      // Update user document in Firestore
+      const userDocRef = doc(db, 'users', userId);
+      const userDoc = await getDoc(userDocRef);
+      
+      const timestamp = new Date().toISOString();
+      const updateData = {
+        isPremium: true,
+        premiumSince: timestamp,
+        updatedAt: timestamp,
+        subscriptionStatus: 'active',
+        paymentSource: 'stripe',
+        forcedUpdate: true,
+        forcedUpdateTimestamp: timestamp
+      };
+      
+      if (userDoc.exists()) {
+        // Update existing document
+        await updateDoc(userDocRef, updateData);
+      } else {
+        // Create new document
+        await setDoc(userDocRef, {
+          uid: userId,
+          email: user?.email || '',
+          ...updateData,
+          createdAt: timestamp
+        });
+      }
+      
+      // Update local storage
+      localStorage.setItem('isPremium', 'true');
+      localStorage.setItem('premiumSince', timestamp);
+      localStorage.setItem('premiumUserId', userId);
+      localStorage.setItem('premiumUpdatedAt', timestamp);
+      
+      // Update client state
+      setIsPremium(true);
+      
+      // Sync premium status if this is the current user
+      if (user && user.uid === userId) {
+        await syncPremiumStatus();
+      }
+      
+      // Update debug info
+      setDebugInfo(current => ({
+        ...current,
+        forcedUpdate: {
+          success: true,
+          timestamp,
+          userId
+        }
+      }));
+      
+      toast({
+        title: "Premium Status Forced",
+        description: "The premium status has been manually updated in the database.",
+      });
+    } catch (error) {
+      console.error('Error forcing premium status:', error);
+      
+      setDebugInfo(current => ({
+        ...current,
+        forcedUpdateError: {
+          message: error instanceof Error ? error.message : String(error),
+          timestamp: new Date().toISOString()
+        }
+      }));
+      
+      toast({
+        title: "Update Error",
+        description: "Failed to force premium status update.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsForcing(false);
+    }
+  };
+
   return (
     <Layout>
       <div className="container max-w-md mx-auto py-12 px-4">
@@ -304,10 +400,22 @@ const PaymentSuccessPage = () => {
                   <div className="text-left mt-2">
                     <div className="flex justify-between mb-2">
                       <span className="text-sm font-medium">Payment Status Details</span>
-                      <Button variant="ghost" size="sm" onClick={copyDebugInfo} className="h-6 gap-1">
-                        <ClipboardCopy className="h-3 w-3" />
-                        <span className="text-xs">Copy</span>
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={forceUpdatePremiumStatus} 
+                          disabled={isForcing}
+                          className="h-6 gap-1 bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                        >
+                          <Shield className="h-3 w-3" />
+                          <span className="text-xs">Force Premium</span>
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={copyDebugInfo} className="h-6 gap-1">
+                          <ClipboardCopy className="h-3 w-3" />
+                          <span className="text-xs">Copy</span>
+                        </Button>
+                      </div>
                     </div>
                     <div className="bg-muted p-2 rounded text-xs font-mono max-h-60 overflow-auto">
                       <pre>{JSON.stringify(debugInfo, null, 2)}</pre>

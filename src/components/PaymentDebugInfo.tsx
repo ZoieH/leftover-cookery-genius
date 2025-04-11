@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '@/services/firebaseService';
-import { doc, getDoc, collection, query, where, orderBy, getDocs, limit, getFirestore } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, orderBy, getDocs, limit, getFirestore, updateDoc, setDoc } from 'firebase/firestore';
 import { isUserPremium } from '@/services/firebaseService';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,7 @@ export default function PaymentDebugInfo() {
   const [isExpanded, setIsExpanded] = useState(false);
   const { toast } = useToast();
   const db = getFirestore();
+  const [isUpdating, setIsUpdating] = useState(false);
 
   // Load user document and payment logs
   const loadData = async () => {
@@ -140,6 +141,58 @@ export default function PaymentDebugInfo() {
     });
   };
 
+  // Manual override to set premium status in Firebase
+  const handleManualOverride = async (setPremium: boolean) => {
+    if (!user) return;
+    
+    setIsUpdating(true);
+    try {
+      // Update user document in Firestore
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userDocRef);
+      
+      const updateData = {
+        isPremium: setPremium,
+        updatedAt: new Date().toISOString(),
+        manuallyUpdated: true,
+        manualUpdateTimestamp: new Date().toISOString()
+      };
+      
+      if (userDoc.exists()) {
+        // Update existing document
+        await updateDoc(userDocRef, updateData);
+      } else {
+        // Create new document
+        await setDoc(userDocRef, {
+          uid: user.uid,
+          email: user.email,
+          ...updateData,
+          createdAt: new Date().toISOString()
+        });
+      }
+      
+      // Sync client state
+      await syncPremiumStatus();
+      
+      // Reload data
+      await loadData();
+      
+      toast({
+        title: `Premium status ${setPremium ? 'enabled' : 'disabled'}`,
+        description: `User's premium status was manually set to ${setPremium ? 'premium' : 'non-premium'}.`,
+      });
+    } catch (error) {
+      console.error('Error updating premium status:', error);
+      toast({
+        title: "Update Error",
+        description: "Failed to update premium status in the database.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   if (!user) return null;
 
   const formatTimestamp = (timestamp: any) => {
@@ -190,9 +243,27 @@ export default function PaymentDebugInfo() {
           <div className="flex gap-2">
             <Button 
               size="sm" 
+              variant={userDocument?.isPremium ? "outline" : "default"}
+              onClick={() => handleManualOverride(true)}
+              disabled={isUpdating || (userDocument?.isPremium === true)}
+              className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100 hover:text-green-800"
+            >
+              Set Premium: ON
+            </Button>
+            <Button 
+              size="sm" 
+              variant={userDocument?.isPremium ? "default" : "outline"}
+              onClick={() => handleManualOverride(false)}
+              disabled={isUpdating || (userDocument?.isPremium === false)}
+              className="bg-red-50 text-red-700 border-red-200 hover:bg-red-100 hover:text-red-800"
+            >
+              Set Premium: OFF
+            </Button>
+            <Button 
+              size="sm" 
               variant="outline" 
               onClick={handleSyncPremiumStatus}
-              disabled={isLoading}
+              disabled={isLoading || isUpdating}
             >
               <RefreshCw className={`h-3 w-3 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
               Sync Status
@@ -201,7 +272,7 @@ export default function PaymentDebugInfo() {
               size="sm" 
               variant="outline" 
               onClick={loadData}
-              disabled={isLoading}
+              disabled={isLoading || isUpdating}
             >
               <RefreshCw className={`h-3 w-3 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
               Refresh
