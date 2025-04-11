@@ -6,6 +6,7 @@ interface UsageStore {
   searchCount: number;
   isPremium: boolean;
   lastPremiumCheck: number;
+  premiumUserId: string | null;
   incrementSearchCount: () => void;
   resetSearchCount: () => void;
   setIsPremium: (isPremium: boolean) => void;
@@ -18,23 +19,46 @@ export const useUsageStore = create<UsageStore>()(
       searchCount: 0,
       isPremium: false,
       lastPremiumCheck: 0,
+      premiumUserId: null,
       incrementSearchCount: () => set((state) => ({ searchCount: state.searchCount + 1 })),
       resetSearchCount: () => set({ searchCount: 0 }),
-      setIsPremium: (isPremium) => set({ 
-        isPremium,
-        lastPremiumCheck: Date.now()
-      }),
+      setIsPremium: (isPremium) => {
+        const { user } = useAuthStore.getState();
+        const userId = user?.uid || null;
+        
+        // Always update localStorage when setting premium status
+        if (isPremium && userId) {
+          localStorage.setItem('isPremium', 'true');
+          localStorage.setItem('premiumUserId', userId);
+          localStorage.setItem('premiumSince', new Date().toISOString());
+          localStorage.setItem('premiumUpdatedAt', Date.now().toString());
+        }
+        
+        set({ 
+          isPremium,
+          premiumUserId: isPremium ? userId : null,
+          lastPremiumCheck: Date.now()
+        });
+      },
       syncPremiumStatus: async () => {
         const { user } = useAuthStore.getState();
+        const currentState = get();
+        
+        // If no user is logged in, we need special handling
         if (!user) {
-          console.log('No user found, setting premium status to false');
-          set({ isPremium: false });
+          // Only clear premium status if it was associated with a user
+          // This prevents clearing during initial page load before auth is initialized
+          if (currentState.premiumUserId) {
+            console.log('No user logged in, clearing premium status');
+            set({ 
+              isPremium: false,
+              premiumUserId: null
+            });
+          }
           return false;
         }
         
         try {
-          console.log('Starting premium status sync for user:', user.uid);
-          
           // First check localStorage as a fallback mechanism
           const localPremium = localStorage.getItem('isPremium');
           const localPremiumUserId = localStorage.getItem('premiumUserId');
@@ -44,30 +68,36 @@ export const useUsageStore = create<UsageStore>()(
             console.log('Premium status found in localStorage for current user');
             set({ 
               isPremium: true,
+              premiumUserId: user.uid,
               lastPremiumCheck: Date.now()
             });
             return true;
           }
           
           // Then try to fetch from server
-          console.log('Checking premium status from server...');
           const premiumStatus = await isUserPremium(user);
           console.log('Synced premium status from server:', premiumStatus);
           
           if (premiumStatus) {
             // If the user is premium, update localStorage with correct user ID
-            console.log('Setting localStorage premium status to true');
             localStorage.setItem('isPremium', 'true');
             localStorage.setItem('premiumUserId', user.uid);
             localStorage.setItem('premiumSince', new Date().toISOString());
+            localStorage.setItem('premiumUpdatedAt', Date.now().toString());
           } else {
-            console.log('Setting localStorage premium status to false');
-            localStorage.setItem('isPremium', 'false');
+            // Clear localStorage premium if server says user is not premium
+            // Only clear if it was previously set for this user
+            if (localPremiumUserId === user.uid && localPremium === 'true') {
+              localStorage.removeItem('isPremium');
+              localStorage.removeItem('premiumUserId');
+              localStorage.removeItem('premiumSince');
+              localStorage.removeItem('premiumUpdatedAt');
+            }
           }
           
-          console.log('Updating premium status in store to:', premiumStatus);
           set({ 
             isPremium: premiumStatus,
+            premiumUserId: premiumStatus ? user.uid : null,
             lastPremiumCheck: Date.now()
           });
           return premiumStatus;
@@ -82,6 +112,7 @@ export const useUsageStore = create<UsageStore>()(
             console.log('Using premium status from localStorage after server error');
             set({ 
               isPremium: true,
+              premiumUserId: user.uid,
               lastPremiumCheck: Date.now()
             });
             return true;
@@ -93,9 +124,12 @@ export const useUsageStore = create<UsageStore>()(
     }),
     {
       name: 'usage-storage',
-      // Don't persist the premium status - always check from server
+      // Store premium info for persistence between sessions
       partialize: (state) => ({
-        searchCount: state.searchCount
+        searchCount: state.searchCount,
+        isPremium: state.isPremium, 
+        premiumUserId: state.premiumUserId,
+        lastPremiumCheck: state.lastPremiumCheck
       })
     }
   )
@@ -150,9 +184,10 @@ export const getRemainingSearches = async () => {
 
 export const canUsePremiumFeature = async () => {
   const { user } = useAuthStore.getState();
-  if (!user) return false;
-  
   const { isPremium, syncPremiumStatus } = useUsageStore.getState();
+  
+  // Non-logged in users can't use premium features
+  if (!user) return false;
   
   // Check premium status (with caching)
   if (needsPremiumRefresh()) {
@@ -164,18 +199,50 @@ export const canUsePremiumFeature = async () => {
 
 // Initialize the component by syncing premium status on load
 export const initializeUsageService = async () => {
-  const { user } = useAuthStore.getState();
-  if (user) {
-    await useUsageStore.getState().syncPremiumStatus();
-  }
+  // Delay initialization slightly to ensure auth state is loaded first
+  setTimeout(async () => {
+    const { user } = useAuthStore.getState();
+    const { premiumUserId } = useUsageStore.getState();
+    
+    // Validate stored premium status against current user
+    if (premiumUserId && (!user || user.uid !== premiumUserId)) {
+      // User mismatch, reset premium status
+      useUsageStore.setState({ 
+        isPremium: false,
+        premiumUserId: null
+      });
+    } else if (user) {
+      // User is logged in, sync with server
+      await useUsageStore.getState().syncPremiumStatus();
+    }
+    
+    console.log('Usage service initialized');
+  }, 500);
 };
 
 // Auto-sync premium status when user auth state changes
 useAuthStore.subscribe((state) => {
-  if (state.user) {
+  const { user } = state;
+  const { premiumUserId } = useUsageStore.getState();
+  
+  if (user) {
+    // User logged in, check if premium status is already set for this user
+    if (premiumUserId && premiumUserId !== user.uid) {
+      // Different user, reset premium status first
+      useUsageStore.setState({ 
+        isPremium: false,
+        premiumUserId: null
+      });
+    }
+    
+    // Then sync with server
     useUsageStore.getState().syncPremiumStatus();
-  } else {
-    useUsageStore.setState({ isPremium: false });
+  } else if (premiumUserId) {
+    // User logged out, clear premium status that was tied to a user
+    useUsageStore.setState({ 
+      isPremium: false,
+      premiumUserId: null
+    });
   }
 });
 

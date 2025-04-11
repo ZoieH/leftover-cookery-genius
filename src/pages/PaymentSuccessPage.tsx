@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { CheckCircle, Loader2 } from 'lucide-react';
+import { CheckCircle, Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import Layout from '@/components/Layout';
@@ -12,112 +12,96 @@ const PaymentSuccessPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  const { setIsPremium } = useUsageStore();
+  const { setIsPremium, syncPremiumStatus } = useUsageStore();
+  const { user } = useAuthStore();
   const [processing, setProcessing] = useState(true);
   const [success, setSuccess] = useState(false);
+  const [warning, setWarning] = useState<string | null>(null);
 
   useEffect(() => {
     const processPayment = async () => {
       try {
-        // Get the user ID from URL parameters
+        // Parse URL parameters
         const params = new URLSearchParams(location.search);
-        const userId = params.get('user');
-        const sessionId = params.get('session_id'); // Also check for session_id from server-side flow
-        const returnUrl = params.get('returnUrl'); // Get return URL from params
+        const userId = params.get('user') || user?.uid;
+        const sessionId = params.get('session_id');
+        const nonce = params.get('nonce');
+        const returnUrl = params.get('returnUrl');
         
-        console.log('Processing payment success with params:', {
-          userId,
-          sessionId,
-          returnUrl
-        });
+        console.log('Processing payment success:', { userId, sessionId, nonce });
 
+        // Validate required parameters
         if (!userId && !sessionId) {
-          console.error('Payment information missing - no userId or sessionId');
-          
-          // Try to get the current user as a fallback
-          const { user } = useAuthStore.getState();
-          if (user) {
-            console.log('Using current authenticated user as fallback:', user.uid);
-            // Update the user's premium status with the current user ID
-            await handleSuccessfulPayment(user.uid);
-            setIsPremium(true);
-            setSuccess(true);
-            setProcessing(false);
-            
-            toast({
-              title: "Premium Activated!",
-              description: "You now have access to all premium features.",
-            });
-          } else {
-            toast({
-              title: "Error",
-              description: "Payment information is missing. Please try again.",
-              variant: "destructive",
-            });
-            setProcessing(false);
-            setSuccess(false);
-          }
+          toast({
+            title: "Error",
+            description: "Payment information is missing. Please try again.",
+            variant: "destructive"
+          });
+          setProcessing(false);
+          setSuccess(false);
           return;
         }
 
-        // Client-side handling of premium status update
+        // Immediately update local state for responsive UX
+        setIsPremium(true);
+        
+        // Set up recovery if the page is closed before processing completes
+        localStorage.setItem('payment_success_pending', 'true');
+        if (userId) {
+          localStorage.setItem('pending_premium_user_id', userId);
+        }
+        
         try {
-          // If we have a userId, update premium status directly
+          // If we have a userId, update premium status in the database
           if (userId) {
-            console.log('Updating premium status for user ID:', userId);
-            // Update the user's premium status
-            await handleSuccessfulPayment(userId);
-            
-            // Update local state
-            setIsPremium(true);
-            
-            // Show success toast
-            toast({
-              title: "Premium Activated!",
-              description: "You now have access to all premium features.",
-            });
-            
-            // Force a premium status sync after a short delay to ensure updates propagate
-            setTimeout(() => {
-              console.log('Performing delayed premium status sync');
-              useUsageStore.getState().syncPremiumStatus();
-            }, 2000);
-            
-            setSuccess(true);
-            setProcessing(false);
-          } 
-          // If we only have sessionId but no userId, handle that case
-          else if (sessionId) {
-            console.log('Handling session-only based success:', sessionId);
-            // Get current user
-            const { user } = useAuthStore.getState();
-            if (user) {
-              console.log('Using current user for session-based success:', user.uid);
-              await handleSuccessfulPayment(user.uid);
+            // First try to sync premium status if user is logged in to ensure we get the latest state
+            if (user && user.uid === userId) {
+              await syncPremiumStatus();
             }
             
-            setIsPremium(true);
-            setSuccess(true);
-            setProcessing(false);
+            const dbUpdateSuccess = await handleSuccessfulPayment(userId, nonce);
             
-            toast({
-              title: "Premium Activated!",
-              description: "You now have access to all premium features.",
-            });
+            if (!dbUpdateSuccess) {
+              setWarning('Your premium status was activated, but we encountered an issue syncing with our server. Your access is still enabled, and we\'ll automatically retry the sync.');
+            }
+            
+            // Re-sync to ensure everything is updated correctly
+            if (user && user.uid === userId) {
+              setTimeout(async () => {
+                await syncPremiumStatus();
+              }, 1000); // Slight delay to allow database updates to propagate
+            }
+          } 
+          else if (sessionId) {
+            // For server-initiated flow (likely not used in client-only mode)
+            localStorage.setItem('isPremium', 'true');
+            localStorage.setItem('premiumSince', new Date().toISOString());
+            setWarning('Your payment was successful, but we couldn\'t identify your account. Please contact support if you experience any issues with premium access.');
           }
+          
+          // Show success toast
+          toast({
+            title: "Premium Activated!",
+            description: "You now have access to all premium features.",
+          });
         } catch (updateError) {
           console.error('Error updating user status:', updateError);
+          setWarning('We had trouble updating your account status on our servers, but your premium access has been activated locally. We\'ll automatically try again later.');
           
-          // Even if there's an error with the DB update, still show success to user
-          // The Stripe subscription was created successfully
-          setSuccess(true);
-          setProcessing(false);
-          
-          toast({
-            title: "Premium Activated",
-            description: "Your payment was successful. You now have access to premium features.",
-          });
+          // Store information for later retry
+          localStorage.setItem('payment_recovery_needed', 'true');
+          if (userId) {
+            localStorage.setItem('recovery_user_id', userId);
+          }
         }
+        
+        // Clear pending flags since we've handled the payment
+        localStorage.removeItem('payment_success_pending');
+        localStorage.removeItem('pending_premium_user_id');
+        
+        // Always mark as success for user experience
+        setSuccess(true);
+        setProcessing(false);
         
         // Get return URL from params or localStorage
         let redirectUrl = '/';
@@ -135,9 +119,11 @@ const PaymentSuccessPage = () => {
           }
         }
         
-        // Redirect immediately
-        console.log('Redirecting to:', redirectUrl);
-        navigate(redirectUrl);
+        // Delay redirect to show success message and potential warnings
+        setTimeout(() => {
+          console.log('Redirecting to:', redirectUrl);
+          navigate(redirectUrl);
+        }, warning ? 5000 : 2000); // Longer delay if there's a warning
       } catch (error: any) {
         console.error('Error processing payment:', error);
         toast({
@@ -151,7 +137,7 @@ const PaymentSuccessPage = () => {
     };
 
     processPayment();
-  }, [location.search, toast, setIsPremium, navigate]);
+  }, [location.search, toast, setIsPremium, syncPremiumStatus, navigate, user]);
 
   return (
     <Layout>
@@ -176,11 +162,20 @@ const PaymentSuccessPage = () => {
                   Redirecting you back in a few seconds...
                 </span>
               </p>
+              
+              {warning && (
+                <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-md p-3 mb-4 flex items-start">
+                  <AlertTriangle className="h-5 w-5 flex-shrink-0 mr-2 mt-0.5 text-amber-500" />
+                  <p className="text-sm text-left">{warning}</p>
+                </div>
+              )}
+              
               <Button 
                 onClick={() => {
                   // Get return URL from params or localStorage
                   const params = new URLSearchParams(location.search);
                   const returnUrl = params.get('returnUrl');
+                  
                   let redirectUrl = '/';
                   
                   if (returnUrl) {
@@ -202,6 +197,7 @@ const PaymentSuccessPage = () => {
             </>
           ) : (
             <>
+              <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
               <h1 className="text-2xl font-bold mb-2">Something Went Wrong</h1>
               <p className="text-muted-foreground mb-6">
                 We couldn't process your payment. Please try again or contact support.
@@ -218,7 +214,7 @@ const PaymentSuccessPage = () => {
                   onClick={() => navigate('/')} 
                   className="w-full"
                 >
-                  Return to Home
+                  Return Home
                 </Button>
               </div>
             </>

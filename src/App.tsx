@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { useEffect } from "react";
 import Index from "./pages/Index";
 import IngredientsPage from "./pages/IngredientsPage";
 import RecipePage from "./pages/RecipePage";
@@ -13,30 +14,48 @@ import EmailLinkAuthPage from '@/pages/EmailLinkAuthPage';
 import UserPortalPage from '@/pages/UserPortalPage';
 import PaymentSuccessPage from '@/pages/PaymentSuccessPage';
 import PaymentCanceledPage from '@/pages/PaymentCanceledPage';
+import { initializeUsageService } from '@/services/usageService';
+import { initializeRetryProcessor } from '@/services/stripeService';
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <Router>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/ingredients" element={<IngredientsPage />} />
-          <Route path="/recipe" element={<RecipePage />} />
-          <Route path="/admin" element={<AdminPage />} />
-          <Route path="/upgrade" element={<UpgradePage />} />
-          <Route path="/auth/email-link" element={<EmailLinkAuthPage />} />
-          <Route path="/portal" element={<UserPortalPage />} />
-          <Route path="/payment-success" element={<PaymentSuccessPage />} />
-          <Route path="/payment-canceled" element={<PaymentCanceledPage />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </Router>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  // Initialize services
+  useEffect(() => {
+    // Initialize usage service (premium status checks)
+    initializeUsageService();
+    
+    // Initialize premium status retry processor
+    const cleanupRetryProcessor = initializeRetryProcessor();
+    
+    // Cleanup function
+    return () => {
+      if (cleanupRetryProcessor) cleanupRetryProcessor();
+    };
+  }, []);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <Router>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/ingredients" element={<IngredientsPage />} />
+            <Route path="/recipe" element={<RecipePage />} />
+            <Route path="/admin" element={<AdminPage />} />
+            <Route path="/upgrade" element={<UpgradePage />} />
+            <Route path="/auth/email-link" element={<EmailLinkAuthPage />} />
+            <Route path="/portal" element={<UserPortalPage />} />
+            <Route path="/payment-success" element={<PaymentSuccessPage />} />
+            <Route path="/payment-canceled" element={<PaymentCanceledPage />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Router>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
