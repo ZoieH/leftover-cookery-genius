@@ -116,9 +116,12 @@ export const createCheckoutSession = async (userId: string, email: string) => {
     urlWithParams.searchParams.append("client_reference_id", userId);
     urlWithParams.searchParams.append("prefilled_email", email);
     
-    // Add success and cancel URL parameters
-    urlWithParams.searchParams.append("success_url", `${window.location.origin}/payment-success?user=${encodeURIComponent(userId)}`);
-    urlWithParams.searchParams.append("cancel_url", `${window.location.origin}/payment-canceled`);
+    // Add success and cancel URL parameters with proper encoding
+    const successUrl = `${window.location.origin}/payment-success?user=${encodeURIComponent(userId)}&success=true`;
+    const cancelUrl = `${window.location.origin}/payment-canceled?returnUrl=${encodeURIComponent(window.location.pathname)}`;
+    
+    urlWithParams.searchParams.append("success_url", successUrl);
+    urlWithParams.searchParams.append("cancel_url", cancelUrl);
     
     // Redirect to the payment link
     window.location.href = urlWithParams.toString();
