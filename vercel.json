@@ -17,12 +17,14 @@
       "dest": "/server/index.js"
     },
     {
+      "handle": "filesystem"
+    },
+    {
       "src": "/(.*)",
-      "dest": "/dist/$1"
+      "dest": "/dist/index.html"
     }
   ],
   "env": {
-    "FRONTEND_URL": "${FRONTEND_URL}",
-    "NODE_ENV": "production"
+    "FRONTEND_URL": "${FRONTEND_URL}"
   }
 }

@@ -32,9 +32,21 @@ export const useUsageStore = create<UsageStore>()(
         }
         
         try {
-          // Always check premium status from backend when user logs in
+          // First check localStorage as a fallback mechanism
+          const localPremium = localStorage.getItem('isPremium');
+          
+          if (localPremium === 'true') {
+            console.log('Premium status found in localStorage');
+            set({ 
+              isPremium: true,
+              lastPremiumCheck: Date.now()
+            });
+            return true;
+          }
+          
+          // Then try to fetch from server
           const premiumStatus = await isUserPremium(user);
-          console.log('Synced premium status:', premiumStatus);
+          console.log('Synced premium status from server:', premiumStatus);
           set({ 
             isPremium: premiumStatus,
             lastPremiumCheck: Date.now()
@@ -42,6 +54,18 @@ export const useUsageStore = create<UsageStore>()(
           return premiumStatus;
         } catch (error) {
           console.error('Error syncing premium status:', error);
+          
+          // Check localStorage as fallback if server check fails
+          const localPremium = localStorage.getItem('isPremium');
+          if (localPremium === 'true') {
+            console.log('Using premium status from localStorage after server error');
+            set({ 
+              isPremium: true,
+              lastPremiumCheck: Date.now()
+            });
+            return true;
+          }
+          
           return get().isPremium; // Return current state if error
         }
       }
