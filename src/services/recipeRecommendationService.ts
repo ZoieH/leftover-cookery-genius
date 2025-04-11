@@ -62,9 +62,10 @@ export const recommendRecipesFromIngredients = async (
 
     // Add local recipes to our collection
     collectedRecipes = [...collectedRecipes, ...sortedLocalRecipes.slice(0, remainingCount)];
+    const localRecipesAdded = Math.min(sortedLocalRecipes.length, remainingCount);
     remainingCount = maxResults - collectedRecipes.length;
 
-    console.log(`📊 [RECIPE-SERVICE] Local recipes added: ${sortedLocalRecipes.length > 0 ? sortedLocalRecipes.slice(0, remainingCount + sortedLocalRecipes.length).length : 0}, remaining slots: ${remainingCount}`);
+    console.log(`📊 [RECIPE-SERVICE] Local recipes added: ${localRecipesAdded}, remaining slots: ${remainingCount}`);
     
     // If we've reached our max, return early
     if (remainingCount <= 0) {
@@ -87,9 +88,10 @@ export const recommendRecipesFromIngredients = async (
 
       // Add Spoonacular recipes to our collection, but only up to remaining count
       collectedRecipes = [...collectedRecipes, ...sortedSpoonacularRecipes.slice(0, remainingCount)];
+      const spoonacularRecipesAdded = Math.min(sortedSpoonacularRecipes.length, remainingCount);
       remainingCount = maxResults - collectedRecipes.length;
 
-      console.log(`📊 [RECIPE-SERVICE] Spoonacular recipes added: ${sortedSpoonacularRecipes.length > 0 ? sortedSpoonacularRecipes.slice(0, remainingCount + sortedSpoonacularRecipes.length).length : 0}, remaining slots: ${remainingCount}`);
+      console.log(`📊 [RECIPE-SERVICE] Spoonacular recipes added: ${spoonacularRecipesAdded}, remaining slots: ${remainingCount}`);
 
       // If we've reached our max, return early
       if (remainingCount <= 0) {
