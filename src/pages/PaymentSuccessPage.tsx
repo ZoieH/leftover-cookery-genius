@@ -1,13 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { CheckCircle, Loader2, AlertTriangle, Bug, ClipboardCopy, Shield } from 'lucide-react';
+import { CheckCircle, Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import Layout from '@/components/Layout';
 import { handleSuccessfulPayment, storePaymentTransactionDetails } from '@/services/stripeService';
 import { useUsageStore } from '@/services/usageService';
 import { useAuthStore } from '@/services/firebaseService';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { getFirestore, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 
 const PaymentSuccessPage = () => {
@@ -19,9 +18,6 @@ const PaymentSuccessPage = () => {
   const [processing, setProcessing] = useState(true);
   const [success, setSuccess] = useState(false);
   const [warning, setWarning] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState<Record<string, any>>({});
-  const [isDebugExpanded, setIsDebugExpanded] = useState(false);
-  const [isForcing, setIsForcing] = useState(false);
   const db = getFirestore();
 
   useEffect(() => {
@@ -58,25 +54,7 @@ const PaymentSuccessPage = () => {
           isRedirectSuccess,
           redirectStatus
         });
-        console.log('URL parameters:', Object.fromEntries([...params.entries()]));
         
-        // Collect debug info
-        const paymentInfo = { 
-          userId, 
-          sessionId, 
-          nonce, 
-          returnUrl,
-          redirectStatus,
-          localStorage: {
-            payment_user_id: storedUserId,
-            payment_nonce: storedNonce,
-            payment_return_url: storedReturnUrl
-          }
-        };
-        
-        console.log('Processing payment success:', paymentInfo);
-        setDebugInfo(current => ({ ...current, paymentParams: paymentInfo }));
-
         // Validate required parameters
         if (!userId) {
           toast({
@@ -101,15 +79,6 @@ const PaymentSuccessPage = () => {
         // Immediately update local state for responsive UX
         setIsPremium(true);
         
-        // Get initial state for debugging
-        const initialState = {
-          localStorage: collectLocalStorageItems(),
-          userObj: user ? { uid: user.uid, email: user.email } : null,
-          isPremium: useUsageStore.getState().isPremium
-        };
-        
-        setDebugInfo(current => ({ ...current, initialState }));
-        
         try {
           // Record the payment success page visit
           storePaymentTransactionDetails({
@@ -127,36 +96,12 @@ const PaymentSuccessPage = () => {
             // First try to sync premium status if user is logged in to ensure we get the latest state
             if (user && user.uid === userId) {
               await syncPremiumStatus();
-              
-              // Log status after sync
-              const afterSyncState = {
-                isPremium: useUsageStore.getState().isPremium,
-                timestamp: new Date().toISOString()
-              };
-              
-              setDebugInfo(current => ({ 
-                ...current, 
-                afterSync: afterSyncState 
-              }));
             }
             
             // Process the payment through our main handler
             console.log(`Processing payment for user ${userId} with nonce ${nonce || 'none'}`);
             const dbUpdateSuccess = await handleSuccessfulPayment(userId, nonce);
             console.log(`Payment processing result: ${dbUpdateSuccess ? 'success' : 'failed'}`);
-            
-            // Log status after payment processing
-            const afterPaymentState = {
-              dbUpdateSuccess,
-              isPremium: useUsageStore.getState().isPremium,
-              localStorage: collectLocalStorageItems(),
-              timestamp: new Date().toISOString()
-            };
-            
-            setDebugInfo(current => ({ 
-              ...current, 
-              afterPayment: afterPaymentState 
-            }));
             
             if (!dbUpdateSuccess) {
               setWarning('Your premium status was activated, but we encountered an issue syncing with our server. Your access is still enabled, and we\'ll automatically retry the sync.');
@@ -173,18 +118,6 @@ const PaymentSuccessPage = () => {
             if (user && user.uid === userId) {
               setTimeout(async () => {
                 await syncPremiumStatus();
-                
-                // Log final state
-                const finalState = {
-                  isPremium: useUsageStore.getState().isPremium,
-                  localStorage: collectLocalStorageItems(),
-                  timestamp: new Date().toISOString()
-                };
-                
-                setDebugInfo(current => ({ 
-                  ...current, 
-                  finalState 
-                }));
               }, 1000); // Slight delay to allow database updates to propagate
             }
           } 
@@ -209,16 +142,6 @@ const PaymentSuccessPage = () => {
           if (userId) {
             localStorage.setItem('recovery_user_id', userId);
           }
-          
-          // Log error
-          setDebugInfo(current => ({ 
-            ...current, 
-            error: {
-              message: updateError instanceof Error ? updateError.message : String(updateError),
-              stack: updateError instanceof Error ? updateError.stack : null,
-              timestamp: new Date().toISOString()
-            }
-          }));
           
           // Record the error for later analysis
           storePaymentTransactionDetails({
@@ -261,16 +184,6 @@ const PaymentSuccessPage = () => {
         setProcessing(false);
         setSuccess(false);
         
-        // Log error
-        setDebugInfo(current => ({ 
-          ...current, 
-          error: {
-            message: error.message || String(error),
-            stack: error.stack,
-            timestamp: new Date().toISOString()
-          }
-        }));
-        
         // Record the critical error
         if (user) {
           storePaymentTransactionDetails({
@@ -296,120 +209,6 @@ const PaymentSuccessPage = () => {
       }
     };
   }, [location.search, toast, setIsPremium, syncPremiumStatus, navigate, user]);
-
-  // Helper function to collect relevant localStorage items
-  const collectLocalStorageItems = () => {
-    const items: Record<string, string> = {};
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && (key.includes('premium') || key.includes('payment'))) {
-        items[key] = localStorage.getItem(key) || '';
-      }
-    }
-    return items;
-  };
-
-  // Helper to copy debug info to clipboard
-  const copyDebugInfo = () => {
-    navigator.clipboard.writeText(JSON.stringify(debugInfo, null, 2));
-    toast({
-      title: "Copied",
-      description: "Debug information copied to clipboard",
-    });
-  };
-
-  // Force premium status update directly in Firebase
-  const forceUpdatePremiumStatus = async () => {
-    const params = new URLSearchParams(location.search);
-    const userId = params.get('user') || user?.uid;
-    
-    if (!userId) {
-      toast({
-        title: "Error",
-        description: "No user ID found to update premium status",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    setIsForcing(true);
-    try {
-      // Update user document in Firestore
-      const userDocRef = doc(db, 'users', userId);
-      const userDoc = await getDoc(userDocRef);
-      
-      const timestamp = new Date().toISOString();
-      const updateData = {
-        isPremium: true,
-        premiumSince: timestamp,
-        updatedAt: timestamp,
-        subscriptionStatus: 'active',
-        paymentSource: 'stripe',
-        forcedUpdate: true,
-        forcedUpdateTimestamp: timestamp
-      };
-      
-      if (userDoc.exists()) {
-        // Update existing document
-        await updateDoc(userDocRef, updateData);
-      } else {
-        // Create new document
-        await setDoc(userDocRef, {
-          uid: userId,
-          email: user?.email || '',
-          ...updateData,
-          createdAt: timestamp
-        });
-      }
-      
-      // Update local storage
-      localStorage.setItem('isPremium', 'true');
-      localStorage.setItem('premiumSince', timestamp);
-      localStorage.setItem('premiumUserId', userId);
-      localStorage.setItem('premiumUpdatedAt', timestamp);
-      
-      // Update client state
-      setIsPremium(true);
-      
-      // Sync premium status if this is the current user
-      if (user && user.uid === userId) {
-        await syncPremiumStatus();
-      }
-      
-      // Update debug info
-      setDebugInfo(current => ({
-        ...current,
-        forcedUpdate: {
-          success: true,
-          timestamp,
-          userId
-        }
-      }));
-      
-      toast({
-        title: "Premium Status Forced",
-        description: "The premium status has been manually updated in the database.",
-      });
-    } catch (error) {
-      console.error('Error forcing premium status:', error);
-      
-      setDebugInfo(current => ({
-        ...current,
-        forcedUpdateError: {
-          message: error instanceof Error ? error.message : String(error),
-          timestamp: new Date().toISOString()
-        }
-      }));
-      
-      toast({
-        title: "Update Error",
-        description: "Failed to force premium status update.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsForcing(false);
-    }
-  };
 
   // Add this as a new function in the component before the return statement
   const handleReturnNow = () => {
@@ -448,10 +247,6 @@ const PaymentSuccessPage = () => {
               <h1 className="text-2xl font-bold mb-2">Payment Successful!</h1>
               <p className="text-muted-foreground mb-6">
                 Thank you for upgrading to Premium! You now have access to all premium features.
-                <br />
-                <span className="text-sm mt-2 block">
-                  Redirecting you back in a few seconds...
-                </span>
               </p>
               
               {warning && (
@@ -467,46 +262,6 @@ const PaymentSuccessPage = () => {
               >
                 Return Now
               </Button>
-              
-              {/* Debug Info */}
-              <Collapsible 
-                open={isDebugExpanded} 
-                onOpenChange={setIsDebugExpanded}
-                className="mt-4 border-t pt-4"
-              >
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="sm" className="gap-1">
-                    <Bug className="h-3 w-3" />
-                    <span>Debug Info</span>
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="text-left mt-2">
-                    <div className="flex justify-between mb-2">
-                      <span className="text-sm font-medium">Payment Status Details</span>
-                      <div className="flex gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={forceUpdatePremiumStatus} 
-                          disabled={isForcing}
-                          className="h-6 gap-1 bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
-                        >
-                          <Shield className="h-3 w-3" />
-                          <span className="text-xs">Force Premium</span>
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={copyDebugInfo} className="h-6 gap-1">
-                          <ClipboardCopy className="h-3 w-3" />
-                          <span className="text-xs">Copy</span>
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="bg-muted p-2 rounded text-xs font-mono max-h-60 overflow-auto">
-                      <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
-                    </div>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
             </>
           ) : (
             <>
@@ -530,34 +285,6 @@ const PaymentSuccessPage = () => {
                   Return Home
                 </Button>
               </div>
-              
-              {/* Debug Info for Errors */}
-              <Collapsible 
-                open={isDebugExpanded} 
-                onOpenChange={setIsDebugExpanded}
-                className="mt-4 border-t pt-4"
-              >
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="sm" className="gap-1">
-                    <Bug className="h-3 w-3" />
-                    <span>Debug Info</span>
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="text-left mt-2">
-                    <div className="flex justify-between mb-2">
-                      <span className="text-sm font-medium">Error Details</span>
-                      <Button variant="ghost" size="sm" onClick={copyDebugInfo} className="h-6 gap-1">
-                        <ClipboardCopy className="h-3 w-3" />
-                        <span className="text-xs">Copy</span>
-                      </Button>
-                    </div>
-                    <div className="bg-muted p-2 rounded text-xs font-mono max-h-60 overflow-auto">
-                      <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
-                    </div>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
             </>
           )}
         </div>
