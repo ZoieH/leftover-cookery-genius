@@ -223,21 +223,11 @@ export const handleSuccessfulPayment = async (userId: string, nonce?: string) =>
   try {
     console.log('Updating premium status for user:', userId);
     
-    // Transaction details to be recorded
-    const transactionDetails: PaymentTransactionDetails = {
-      userId,
-      success: false, // Will be updated at the end if successful
-      source: 'stripe',
-      nonce
-    };
-    
     // Verify nonce to prevent duplicate processing if provided
     if (nonce) {
       const storedNonce = localStorage.getItem('payment_nonce');
       if (storedNonce && storedNonce !== nonce) {
         console.warn('Nonce mismatch, possible duplicate payment processing attempt');
-        // Still continue as this might be a legitimate retry
-        transactionDetails.nonceMismatch = true;
       }
       // Clear the nonce to prevent reuse
       localStorage.removeItem('payment_nonce');
@@ -258,175 +248,55 @@ export const handleSuccessfulPayment = async (userId: string, nonce?: string) =>
       lastVerified: timestamp
     };
     
-    transactionDetails.timestamp = timestamp;
-    
-    // Create transaction log for auditing and troubleshooting
-    let logId = '';
+    // Try to update the user document in Firestore
     try {
-      const logRef = doc(collection(db, 'payment_logs'));
-      logId = logRef.id;
-      transactionDetails.logId = logId;
-      
-      await setDoc(logRef, {
-        userId,
-        action: 'premium_activation',
-        timestamp,
-        success: true,
-        clientInfo: {
-          userAgent: navigator.userAgent,
-          timestamp: Date.now()
-        }
-      });
-    } catch (logError) {
-      // Non-critical error, just log and continue
-      console.warn('Failed to create payment log:', logError);
-      transactionDetails.logError = String(logError);
-    }
-    
-    // First try to update the database
-    let dbUpdateSuccess = false;
-    
-    try {
-      // Get the current user document
       const userDoc = await getDoc(userDocRef);
       
-      if (!userDoc.exists()) {
-        console.log('User document not found, creating new document');
-        
-        // Get the current authenticated user to ensure we have all the user info
-        const currentUser = auth.currentUser;
-        let email = '';
-        
-        if (currentUser && currentUser.uid === userId) {
-          email = currentUser.email || '';
-          console.log('Using authenticated user email:', email);
-        } else {
-          console.log('User not currently authenticated, using minimal data');
-        }
-        
-        // Create a new user document with all available information
+      if (userDoc.exists()) {
+        // Update the existing document
+        await updateDoc(userDocRef, premiumData);
+        console.log('Updated premium status in Firestore for user:', userId);
+      } else {
+        // Create a new user document if it doesn't exist
         await setDoc(userDocRef, {
           uid: userId,
-          email: email,
           ...premiumData,
           createdAt: timestamp
         });
-        console.log('Created new user document with premium status');
-        transactionDetails.documentCreated = true;
-      } else {
-        console.log('User document exists, updating premium status');
-        // Update the existing user document, preserving other fields
-        await updateDoc(userDocRef, {
-          ...premiumData
-        });
-        console.log('Updated user document with premium status');
-        transactionDetails.documentUpdated = true;
+        console.log('Created new user document with premium status for user:', userId);
       }
       
-      // Verify the update was successful
-      const updatedDoc = await getDoc(userDocRef);
-      const updatedData = updatedDoc.data();
+      // Update the premium status in localStorage
+      localStorage.setItem('isPremium', 'true');
+      localStorage.setItem('premiumSince', timestamp);
+      localStorage.setItem('premiumUserId', userId);
       
-      if (updatedData && updatedData.isPremium === true) {
-        console.log('Premium status update verification successful');
-        dbUpdateSuccess = true;
-        transactionDetails.verificationSuccess = true;
-        
-        // Store Stripe customer ID if available
-        if (updatedData.stripeCustomerId) {
-          transactionDetails.stripeCustomerId = updatedData.stripeCustomerId;
-        }
-      } else {
-        console.error('Premium status update verification failed');
-        transactionDetails.verificationFailed = true;
-        // Continue to fallback mechanism
-      }
+      // Update the Zustand store
+      useUsageStore.getState().setIsPremium(true);
+      
+      return true;
     } catch (dbError) {
-      console.error('Database update error:', dbError);
-      transactionDetails.dbError = String(dbError);
-      // Continue to fallback mechanism
-    }
-    
-    // Always update local storage for client-side detection (even if DB update fails)
-    localStorage.setItem('isPremium', 'true');
-    localStorage.setItem('premiumSince', premiumData.premiumSince);
-    localStorage.setItem('premiumUserId', userId);
-    localStorage.setItem('premiumUpdatedAt', timestamp);
-    
-    // Clear payment initiation timestamp
-    localStorage.removeItem('payment_initiated');
-    
-    // Update the usage store state - important for immediate UI updates
-    const { setIsPremium } = useUsageStore.getState();
-    setIsPremium(true);
-    console.log('Updated localStorage and app state with premium status');
-
-    // Check if the current authenticated user matches the userId 
-    const currentUser = auth.currentUser;
-    if (currentUser && currentUser.uid !== userId) {
-      console.warn('Premium status updated for userId that does not match current auth user', {
-        currentAuthUserId: currentUser.uid,
-        updatedUserId: userId
-      });
-      transactionDetails.userMismatch = true;
-    }
-    
-    // If database update failed, schedule a retry
-    if (!dbUpdateSuccess) {
-      console.log('Scheduling retry for database update');
+      console.error('Error updating Firestore:', dbError);
       
-      // Add to a retry queue in localStorage
-      try {
-        const retryQueue = JSON.parse(localStorage.getItem('premium_update_retry_queue') || '[]');
-        retryQueue.push({
-          userId,
-          timestamp,
-          attemptCount: 0,
-          lastAttempt: Date.now()
-        });
-        localStorage.setItem('premium_update_retry_queue', JSON.stringify(retryQueue));
-        
-        // Schedule immediate retry if possible
-        setTimeout(() => {
-          // Try to process retry queue - this will be picked up by code that handles retries
-          localStorage.setItem('premium_retry_requested', Date.now().toString());
-        }, 5000);
-        
-        transactionDetails.retryScheduled = true;
-      } catch (retryError) {
-        console.error('Failed to schedule retry:', retryError);
-        transactionDetails.retryError = String(retryError);
-      }
+      // Even if the database update fails, set the premium status locally
+      localStorage.setItem('isPremium', 'true');
+      localStorage.setItem('premiumSince', timestamp);
+      localStorage.setItem('premiumUserId', userId);
+      
+      // Update the Zustand store
+      useUsageStore.getState().setIsPremium(true);
+      
+      // Add to retry queue
+      const pendingUpdates = localStorage.getItem('premium_retry_queue');
+      const retryQueue = pendingUpdates ? JSON.parse(pendingUpdates) : [];
+      retryQueue.push({userId, timestamp});
+      localStorage.setItem('premium_retry_queue', JSON.stringify(retryQueue));
+      
+      return false;
     }
-    
-    // Set final transaction status
-    transactionDetails.success = dbUpdateSuccess;
-    
-    // Store transaction details
-    storePaymentTransactionDetails(transactionDetails);
-    
-    return dbUpdateSuccess;
   } catch (error) {
-    console.error('Error updating premium status:', error);
-    
-    // Record the failed transaction
-    const transactionDetails = {
-      userId,
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-      timestamp: new Date().toISOString(),
-      source: 'stripe'
-    };
-    storePaymentTransactionDetails(transactionDetails);
-    
-    // Always ensure user gets premium access by updating local storage
-    localStorage.setItem('isPremium', 'true');
-    localStorage.setItem('premiumSince', new Date().toISOString());
-    localStorage.setItem('premiumUserId', userId);
-    
-    // Force update the app state
-    useUsageStore.getState().setIsPremium(true);
-    throw error;
+    console.error('Error in handleSuccessfulPayment:', error);
+    return false;
   }
 };
 
@@ -598,16 +468,6 @@ export const attemptPaymentRecovery = async () => {
       return false;
     }
     
-    // Record the recovery attempt
-    storePaymentTransactionDetails({
-      userId,
-      success: false,
-      source: 'payment-recovery',
-      timestamp: new Date().toISOString(),
-      status: 'recovering',
-      nonce: nonce || undefined
-    });
-    
     // Get currently logged-in user if available
     const currentUser = auth.currentUser;
     
@@ -620,17 +480,7 @@ export const attemptPaymentRecovery = async () => {
       const result = await handleSuccessfulPayment(userId, nonce);
       
       if (result) {
-        console.log('Payment recovery successful - updating transaction status');
-        
-        // Record the successful recovery
-        storePaymentTransactionDetails({
-          userId,
-          success: true,
-          source: 'payment-recovery',
-          timestamp: new Date().toISOString(),
-          status: 'recovered',
-          nonce: nonce || undefined
-        });
+        console.log('Payment recovery successful');
         
         // Clear the pending payment flags
         localStorage.removeItem('payment_success_pending');
@@ -644,16 +494,6 @@ export const attemptPaymentRecovery = async () => {
       } else {
         console.error('Payment recovery failed - will try again on next app init');
         
-        // Record the failed recovery
-        storePaymentTransactionDetails({
-          userId,
-          success: false,
-          source: 'payment-recovery',
-          timestamp: new Date().toISOString(),
-          status: 'recovery-failed',
-          nonce: nonce || undefined
-        });
-        
         // Keep the recovery flags for next attempt
         localStorage.setItem('payment_recovery_needed', 'true');
         
@@ -662,31 +502,10 @@ export const attemptPaymentRecovery = async () => {
     } else if (currentUser) {
       // User is logged in but doesn't match payment user
       console.warn(`Current user (${currentUser.uid}) doesn't match payment user (${userId}) - can't recover payment`);
-      
-      // Record the mismatch
-      storePaymentTransactionDetails({
-        userId,
-        success: false,
-        source: 'payment-recovery',
-        timestamp: new Date().toISOString(),
-        status: 'user-mismatch',
-        error: `Current user (${currentUser.uid}) doesn't match payment user (${userId})`
-      });
-      
       return false;
     } else {
       // User is not logged in
       console.warn('User is not logged in - can\'t recover payment');
-      
-      // Record the login required state
-      storePaymentTransactionDetails({
-        userId,
-        success: false,
-        source: 'payment-recovery',
-        timestamp: new Date().toISOString(),
-        status: 'login-required'
-      });
-      
       return false;
     }
   } catch (error) {

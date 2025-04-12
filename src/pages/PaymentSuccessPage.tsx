@@ -4,7 +4,7 @@ import { CheckCircle, Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import Layout from '@/components/Layout';
-import { handleSuccessfulPayment, storePaymentTransactionDetails } from '@/services/stripeService';
+import { handleSuccessfulPayment } from '@/services/stripeService';
 import { useUsageStore } from '@/services/usageService';
 import { useAuthStore } from '@/services/firebaseService';
 import { getFirestore, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
@@ -80,17 +80,6 @@ const PaymentSuccessPage = () => {
         setIsPremium(true);
         
         try {
-          // Record the payment success page visit
-          storePaymentTransactionDetails({
-            userId,
-            success: false, // Will be updated after DB update
-            source: 'payment-success-page',
-            timestamp: new Date().toISOString(),
-            status: 'processing',
-            nonce: nonce || undefined,
-            returnUrl: returnUrl || undefined
-          });
-
           // If we have a userId, update premium status in the database
           if (userId) {
             // First try to sync premium status if user is logged in to ensure we get the latest state
@@ -142,17 +131,6 @@ const PaymentSuccessPage = () => {
           if (userId) {
             localStorage.setItem('recovery_user_id', userId);
           }
-          
-          // Record the error for later analysis
-          storePaymentTransactionDetails({
-            userId,
-            success: false,
-            source: 'payment-success-page',
-            timestamp: new Date().toISOString(),
-            status: 'error',
-            error: updateError instanceof Error ? updateError.message : String(updateError),
-            nonce: nonce || undefined
-          });
         }
         
         // Always mark as success for user experience
@@ -183,18 +161,6 @@ const PaymentSuccessPage = () => {
         });
         setProcessing(false);
         setSuccess(false);
-        
-        // Record the critical error
-        if (user) {
-          storePaymentTransactionDetails({
-            userId: user.uid,
-            success: false,
-            source: 'payment-success-page',
-            timestamp: new Date().toISOString(),
-            status: 'critical-error',
-            error: error.message || String(error)
-          });
-        }
       }
     };
 
