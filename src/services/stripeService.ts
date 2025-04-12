@@ -1,11 +1,8 @@
 import { loadStripe } from '@stripe/stripe-js';
 import { getFirestore, collection, addDoc, updateDoc, query, where, getDocs, doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { db, useAuthStore } from './firebaseService';
-import { getAuth } from 'firebase/auth';
+import { auth } from './firebaseService';
 import { useUsageStore } from './usageService';
-
-// Initialize auth
-const auth = getAuth();
 
 // Initialize Stripe
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
@@ -128,6 +125,7 @@ export const createCheckoutSession = async (userId: string, email: string) => {
     
     // Store the user ID associated with this payment attempt
     localStorage.setItem('payment_user_id', userId);
+    console.log('Stored payment details in localStorage', { userId, nonce, returnUrl: currentPage });
     
     // Record the payment initiation
     storePaymentTransactionDetails({
@@ -149,16 +147,17 @@ export const createCheckoutSession = async (userId: string, email: string) => {
     urlWithParams.searchParams.append("client_reference_id", userId);
     urlWithParams.searchParams.append("prefilled_email", email);
     
-    // Add success and cancel URL parameters with proper encoding
-    // Include nonce to prevent CSRF attacks and enable secure verification
-    const successUrl = `${window.location.origin}/payment-success?user=${encodeURIComponent(userId)}&nonce=${encodeURIComponent(nonce)}&success=true&returnUrl=${encodeURIComponent(currentPage)}`;
-    const cancelUrl = `${window.location.origin}/payment-canceled?nonce=${encodeURIComponent(nonce)}&returnUrl=${encodeURIComponent(currentPage)}`;
+    // Using what Stripe payment links actually support
+    // Success URL can include limited parameters like redirect_status
+    const baseSuccessUrl = `${window.location.origin}/payment-success`;
+    const baseCancelUrl = `${window.location.origin}/payment-canceled`;
     
-    urlWithParams.searchParams.append("success_url", successUrl);
-    urlWithParams.searchParams.append("cancel_url", cancelUrl);
+    urlWithParams.searchParams.append("success_url", baseSuccessUrl);
+    urlWithParams.searchParams.append("cancel_url", baseCancelUrl);
     
     // For debugging
     console.log('Payment link URL:', urlWithParams.toString());
+    console.log('IMPORTANT: Payment details stored in localStorage for recovery. User will be redirected to:', baseSuccessUrl);
     
     // Redirect to the payment link
     window.location.href = urlWithParams.toString();
@@ -568,84 +567,130 @@ initializeRetryProcessor();
 // Add automatic payment recovery/verification on app load
 export const attemptPaymentRecovery = async () => {
   try {
-    console.log('Checking for pending payments to recover...');
+    // Check if there's a pending payment
+    const pendingPayment = localStorage.getItem('payment_success_pending');
+    const userId = localStorage.getItem('payment_user_id');
+    const nonce = localStorage.getItem('payment_nonce');
+    const recoveryNeeded = localStorage.getItem('payment_recovery_needed');
     
-    // Check if there's a pending payment in localStorage
-    const paymentUserId = localStorage.getItem('payment_user_id');
-    const paymentNonce = localStorage.getItem('payment_nonce');
-    const paymentSuccess = localStorage.getItem('payment_success_pending');
+    console.log('Checking for pending payments to recover...', { 
+      pendingPayment, 
+      userId, 
+      nonceExists: !!nonce,
+      recoveryNeeded: !!recoveryNeeded
+    });
     
-    // If no pending payment, exit early
-    if (!paymentUserId || !paymentSuccess) {
+    if (!pendingPayment && !recoveryNeeded) {
+      // No pending payment to recover
       return false;
     }
     
-    console.log('Found pending payment for user:', paymentUserId);
+    // If there's a payment to recover, log the attempt
+    console.log('Attempting to recover payment:', { 
+      pendingPayment, 
+      userId, 
+      nonce: nonce ? `${nonce.substring(0, 4)}...` : undefined,
+      recoveryNeeded: !!recoveryNeeded,
+    });
+    
+    if (!userId) {
+      console.error('No user ID found for payment recovery');
+      return false;
+    }
     
     // Record the recovery attempt
     storePaymentTransactionDetails({
-      userId: paymentUserId,
-      success: false, // Will be updated if successful
-      source: 'stripe-recovery',
+      userId,
+      success: false,
+      source: 'payment-recovery',
       timestamp: new Date().toISOString(),
-      status: 'recovery-attempted',
-      nonce: paymentNonce || undefined
+      status: 'recovering',
+      nonce: nonce || undefined
     });
     
-    // Attempt to update the premium status
+    // Get currently logged-in user if available
     const currentUser = auth.currentUser;
     
-    // Only proceed if the user is logged in
-    if (currentUser && currentUser.uid === paymentUserId) {
-      // Update the user's premium status
-      const success = await handleSuccessfulPayment(paymentUserId, paymentNonce || undefined);
+    // Check if the current user matches the stored payment user
+    if (currentUser && currentUser.uid === userId) {
+      // User is logged in and matches the payment user
+      console.log('User is logged in and matches payment user - processing recovery...');
       
-      // Clean up localStorage
-      localStorage.removeItem('payment_success_pending');
-      localStorage.removeItem('payment_user_id');
-      localStorage.removeItem('payment_nonce');
+      // Process the payment
+      const result = await handleSuccessfulPayment(userId, nonce);
       
-      // Record the result
-      storePaymentTransactionDetails({
-        userId: paymentUserId,
-        success: success,
-        source: 'stripe-recovery',
-        timestamp: new Date().toISOString(),
-        status: success ? 'recovery-success' : 'recovery-failed'
-      });
-      
-      return success;
+      if (result) {
+        console.log('Payment recovery successful - updating transaction status');
+        
+        // Record the successful recovery
+        storePaymentTransactionDetails({
+          userId,
+          success: true,
+          source: 'payment-recovery',
+          timestamp: new Date().toISOString(),
+          status: 'recovered',
+          nonce: nonce || undefined
+        });
+        
+        // Clear the pending payment flags
+        localStorage.removeItem('payment_success_pending');
+        localStorage.removeItem('payment_recovery_needed');
+        localStorage.removeItem('recovery_user_id');
+        
+        // Keep user_id and nonce temporarily for verification
+        // They'll be cleared on next app init if everything is properly synced
+        
+        return true;
+      } else {
+        console.error('Payment recovery failed - will try again on next app init');
+        
+        // Record the failed recovery
+        storePaymentTransactionDetails({
+          userId,
+          success: false,
+          source: 'payment-recovery',
+          timestamp: new Date().toISOString(),
+          status: 'recovery-failed',
+          nonce: nonce || undefined
+        });
+        
+        // Keep the recovery flags for next attempt
+        localStorage.setItem('payment_recovery_needed', 'true');
+        
+        return false;
+      }
     } else if (currentUser) {
-      console.warn('User mismatch during payment recovery', {
-        storedUserId: paymentUserId,
-        currentUserId: currentUser.uid
-      });
+      // User is logged in but doesn't match payment user
+      console.warn(`Current user (${currentUser.uid}) doesn't match payment user (${userId}) - can't recover payment`);
       
       // Record the mismatch
       storePaymentTransactionDetails({
-        userId: paymentUserId,
+        userId,
         success: false,
-        source: 'stripe-recovery',
+        source: 'payment-recovery',
         timestamp: new Date().toISOString(),
-        status: 'recovery-user-mismatch',
-        currentUserId: currentUser.uid
+        status: 'user-mismatch',
+        error: `Current user (${currentUser.uid}) doesn't match payment user (${userId})`
       });
-    } else {
-      console.log('User not logged in during payment recovery');
       
-      // Record the lack of authentication
+      return false;
+    } else {
+      // User is not logged in
+      console.warn('User is not logged in - can\'t recover payment');
+      
+      // Record the login required state
       storePaymentTransactionDetails({
-        userId: paymentUserId,
+        userId,
         success: false,
-        source: 'stripe-recovery',
+        source: 'payment-recovery',
         timestamp: new Date().toISOString(),
-        status: 'recovery-no-auth'
+        status: 'login-required'
       });
+      
+      return false;
     }
-    
-    return false;
   } catch (error) {
-    console.error('Error during payment recovery:', error);
+    console.error('Error in payment recovery:', error);
     return false;
   }
 };

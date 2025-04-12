@@ -27,21 +27,58 @@ const PaymentSuccessPage = () => {
   useEffect(() => {
     const processPayment = async () => {
       try {
-        // Parse URL parameters
+        // Get data primarily from localStorage (for payment links)
+        // Fallback to URL parameters (for server-based payments)
         const params = new URLSearchParams(location.search);
-        const userId = params.get('user') || user?.uid;
+        
+        // Check if we have a redirect_status from Stripe, which indicates a successful payment
+        const redirectStatus = params.get('redirect_status');
+        const isRedirectSuccess = redirectStatus === 'succeeded';
+        
+        // First try localStorage (our main storage mechanism)
+        const storedUserId = localStorage.getItem('payment_user_id');
+        const storedNonce = localStorage.getItem('payment_nonce');
+        const storedReturnUrl = localStorage.getItem('payment_return_url');
+        
+        // Then try URL params as fallback
+        const urlUserId = params.get('user');
+        const urlNonce = params.get('nonce');
+        const urlReturnUrl = params.get('returnUrl');
+        
+        // Use stored values with fallbacks to URL parameters
+        const userId = storedUserId || urlUserId || user?.uid;
+        const nonce = storedNonce || urlNonce;
+        const returnUrl = urlReturnUrl || storedReturnUrl;
         const sessionId = params.get('session_id');
-        const nonce = params.get('nonce');
-        const returnUrl = params.get('returnUrl');
+        
+        console.log('Processing payment success - localStorage values:', { 
+          storedUserId, 
+          storedNonce, 
+          storedReturnUrl,
+          isRedirectSuccess,
+          redirectStatus
+        });
+        console.log('URL parameters:', Object.fromEntries([...params.entries()]));
         
         // Collect debug info
-        const paymentInfo = { userId, sessionId, nonce, returnUrl };
+        const paymentInfo = { 
+          userId, 
+          sessionId, 
+          nonce, 
+          returnUrl,
+          redirectStatus,
+          localStorage: {
+            payment_user_id: storedUserId,
+            payment_nonce: storedNonce,
+            payment_return_url: storedReturnUrl
+          }
+        };
         
         console.log('Processing payment success:', paymentInfo);
         setDebugInfo(current => ({ ...current, paymentParams: paymentInfo }));
 
         // Validate required parameters
-        if (!userId && !sessionId) {
+        if (!userId) {
           toast({
             title: "Error",
             description: "Payment information is missing. Please try again.",
@@ -49,6 +86,7 @@ const PaymentSuccessPage = () => {
           });
           setProcessing(false);
           setSuccess(false);
+          console.error('No user ID found for payment processing');
           return;
         }
 
@@ -103,7 +141,9 @@ const PaymentSuccessPage = () => {
             }
             
             // Process the payment through our main handler
+            console.log(`Processing payment for user ${userId} with nonce ${nonce || 'none'}`);
             const dbUpdateSuccess = await handleSuccessfulPayment(userId, nonce);
+            console.log(`Payment processing result: ${dbUpdateSuccess ? 'success' : 'failed'}`);
             
             // Log status after payment processing
             const afterPaymentState = {
@@ -123,8 +163,10 @@ const PaymentSuccessPage = () => {
             } else {
               // Clear payment processing flags on successful DB update
               localStorage.removeItem('payment_success_pending');
-              localStorage.removeItem('payment_user_id');
-              localStorage.removeItem('payment_nonce');
+              
+              // Don't remove user_id and nonce yet - needed for checking premium status
+              // They will be removed on successful redirect or payment verification
+              console.log('Payment processing completed successfully - keeping user_id and nonce for verification');
             }
             
             // Re-sync to ensure everything is updated correctly
@@ -198,21 +240,23 @@ const PaymentSuccessPage = () => {
         let redirectUrl = '/';
         if (returnUrl) {
           redirectUrl = decodeURIComponent(returnUrl);
-          console.log('Using returnUrl from params:', redirectUrl);
+          console.log('Using returnUrl:', redirectUrl);
         } else {
-          const storedReturnUrl = localStorage.getItem('payment_return_url');
-          if (storedReturnUrl) {
-            redirectUrl = storedReturnUrl;
-            console.log('Using returnUrl from localStorage:', redirectUrl);
-            localStorage.removeItem('payment_return_url'); // Clean up
-          } else {
-            console.log('No return URL found, using default: /');
-          }
+          console.log('No return URL found, using default: /');
         }
         
         // Delay redirect to show success message and potential warnings
         setTimeout(() => {
           console.log('Redirecting to:', redirectUrl);
+          
+          // Clean up all payment-related localStorage items when redirecting
+          // ONLY after successful processing
+          localStorage.removeItem('payment_return_url'); 
+          localStorage.removeItem('payment_nonce');
+          localStorage.removeItem('payment_user_id');
+          localStorage.removeItem('payment_success_pending');
+          localStorage.removeItem('payment_initiated');
+          
           navigate(redirectUrl);
         }, warning ? 5000 : 2000); // Longer delay if there's a warning
       } catch (error: any) {
