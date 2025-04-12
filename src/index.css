@@ -138,3 +138,20 @@
     @apply bg-primary text-white;
   }
 }
+
+/* Hide Payment Status Diagnostics section only */
+button:has(> span:contains("Payment Status Diagnostics")),
+div:has(> :contains("Payment Status Diagnostics")),
+div[data-payment-diagnostics],
+.payment-diagnostics-section {
+  display: none !important;
+}
+
+/* Make sure subscription details remain visible */
+div.subscription-details,
+div:has(> span:contains("Subscription Details")),
+div:has(h3:contains("Subscription Details")),
+div:has(> span:contains("Next billing date")),
+div:has(> span:contains("Subscription started")) {
+  display: block !important;
+}
