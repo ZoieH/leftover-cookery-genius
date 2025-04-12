@@ -82,7 +82,7 @@
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
-}
+
 
 @layer base {
   * {
@@ -92,7 +92,7 @@
   body {
     @apply bg-background text-foreground;
   }
-}
+
 
 /* Toast positioning - top for mobile, bottom for larger screens */
 @media (max-width: 640px) {
@@ -102,7 +102,7 @@
     left: 16px !important;
     right: 16px !important;
   }
-}
+
 
 @layer components {
   .ingredient-item {
@@ -137,21 +137,6 @@
   .step-number {
     @apply bg-primary text-white;
   }
-}
 
-/* Hide Payment Status Diagnostics section only */
-button:has(> span:contains("Payment Status Diagnostics")),
-div:has(> :contains("Payment Status Diagnostics")),
-div[data-payment-diagnostics],
-.payment-diagnostics-section {
-  display: none !important;
-}
 
-/* Make sure subscription details remain visible */
-div.subscription-details,
-div:has(> span:contains("Subscription Details")),
-div:has(h3:contains("Subscription Details")),
-div:has(> span:contains("Next billing date")),
-div:has(> span:contains("Subscription started")) {
-  display: block !important;
-}
+
