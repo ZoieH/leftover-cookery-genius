@@ -182,7 +182,7 @@ const Index = () => {
             </CardContent>
           </Card>
         </div>
-
+        
         {/* Powered by section */}
         <div className="max-w-4xl mx-auto mb-16">
           <h2 className="text-2xl font-semibold text-center mb-8">Powered by</h2>
@@ -251,9 +251,9 @@ const Index = () => {
                 Follow the recipe instructions and enjoy your delicious meal
               </p>
             </div>
+            </div>
           </div>
-        </div>
-
+          
         {/* Features section */}
         <div className="max-w-4xl mx-auto mt-16">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -323,9 +323,9 @@ const Index = () => {
             <div className="text-sm text-muted-foreground">
               © {new Date().getFullYear()} Lefto. All rights reserved.
             </div>
-          </div>
-        </footer>
-      </div>
+        </div>
+      </footer>
+    </div>
     </Layout>
   );
 };

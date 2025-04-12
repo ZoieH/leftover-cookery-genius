@@ -9,15 +9,15 @@ import { db } from './firebaseService';
  */
 export async function findMatchingRecipes(params: RecipeSearchParams): Promise<Recipe[]> {
   // First, try to find recipes in Firebase
-  const firebaseRecipes = await searchFirebaseRecipes(params);
-  
+    const firebaseRecipes = await searchFirebaseRecipes(params);
+    
   // If we have enough Firebase recipes, return those
   if (firebaseRecipes.length >= (params.maxResults || 5)) {
-    return firebaseRecipes;
-  }
-  
-  // Otherwise, supplement with local recipes
-  const localRecipes = searchLocalRecipes(params);
+      return firebaseRecipes;
+    }
+    
+    // Otherwise, supplement with local recipes
+    const localRecipes = searchLocalRecipes(params);
   return [...firebaseRecipes, ...localRecipes].slice(0, params.maxResults || 5);
 }
 
@@ -59,16 +59,16 @@ function searchLocalRecipes(params: RecipeSearchParams): Recipe[] {
         a.ingredients.some(recipeIngredient =>
           recipeIngredient.toLowerCase().includes(ingredient.toLowerCase())
         )
-      ).length;
-      
+    ).length;
+    
       const bMatches = ingredients.filter(ingredient =>
         b.ingredients.some(recipeIngredient =>
           recipeIngredient.toLowerCase().includes(ingredient.toLowerCase())
         )
-      ).length;
-      
+    ).length;
+    
       return bMatches - aMatches;
-    });
+  });
 }
 
 /**

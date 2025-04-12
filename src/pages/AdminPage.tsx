@@ -9,7 +9,6 @@ import JsonRecipeImporter from '@/components/JsonRecipeImporter';
 import ChatGptRecipeExtractor from '@/components/ChatGptRecipeExtractor';
 import BulkRecipeScraper from '@/components/BulkRecipeScraper';
 import RecipeImporter from '@/components/RecipeImporter';
-import RecipeEditor from '@/components/RecipeEditor';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 // You can change this password to anything you want
@@ -100,23 +99,13 @@ const AdminPage = () => {
           <div className="grid gap-6">
             <div className="border rounded-lg p-6">
               <h2 className="text-lg font-medium mb-4">Recipe Management</h2>
-              <Tabs defaultValue="editor" className="w-full">
-                <TabsList className="grid w-full grid-cols-5 mb-8">
-                  <TabsTrigger value="editor">Recipe Editor</TabsTrigger>
+              <Tabs defaultValue="chatgpt" className="w-full">
+                <TabsList className="grid w-full grid-cols-4 mb-8">
                   <TabsTrigger value="chatgpt">ChatGPT Extractor</TabsTrigger>
                   <TabsTrigger value="importer">URL Importer</TabsTrigger>
                   <TabsTrigger value="json">JSON Importer</TabsTrigger>
                   <TabsTrigger value="bulk">Bulk Scraper</TabsTrigger>
                 </TabsList>
-                
-                <TabsContent value="editor" className="mt-0">
-                  <div className="space-y-4">
-                    <p className="text-sm text-muted-foreground">
-                      Edit existing recipes in the database. Make changes to ingredients, instructions, cooking times, or dietary tags.
-                    </p>
-                    <RecipeEditor />
-                  </div>
-                </TabsContent>
                 
                 <TabsContent value="chatgpt" className="mt-0">
                   <div className="space-y-4">
