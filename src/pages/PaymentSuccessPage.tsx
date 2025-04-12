@@ -245,20 +245,12 @@ const PaymentSuccessPage = () => {
           console.log('No return URL found, using default: /');
         }
         
-        // Delay redirect to show success message and potential warnings
-        setTimeout(() => {
-          console.log('Redirecting to:', redirectUrl);
-          
-          // Clean up all payment-related localStorage items when redirecting
-          // ONLY after successful processing
-          localStorage.removeItem('payment_return_url'); 
-          localStorage.removeItem('payment_nonce');
-          localStorage.removeItem('payment_user_id');
-          localStorage.removeItem('payment_success_pending');
-          localStorage.removeItem('payment_initiated');
-          
-          navigate(redirectUrl);
-        }, warning ? 5000 : 2000); // Longer delay if there's a warning
+        // Store the redirect URL for the Return Now button to use
+        localStorage.setItem('success_redirect_url', redirectUrl);
+        
+        // No auto-redirect - user will click the Return Now button
+        console.log('Payment processed successfully. Waiting for user to click Return Now.');
+        
       } catch (error: any) {
         console.error('Error processing payment:', error);
         toast({
@@ -419,6 +411,25 @@ const PaymentSuccessPage = () => {
     }
   };
 
+  // Add this as a new function in the component before the return statement
+  const handleReturnNow = () => {
+    // Get stored redirect URL
+    const redirectUrl = localStorage.getItem('success_redirect_url') || '/';
+    
+    console.log('User clicked Return Now. Redirecting to:', redirectUrl);
+    
+    // Clean up all payment-related localStorage items when redirecting
+    localStorage.removeItem('payment_return_url'); 
+    localStorage.removeItem('payment_nonce');
+    localStorage.removeItem('payment_user_id');
+    localStorage.removeItem('payment_success_pending');
+    localStorage.removeItem('payment_initiated');
+    localStorage.removeItem('success_redirect_url');
+    
+    // Navigate to the redirect URL
+    navigate(redirectUrl);
+  };
+
   return (
     <Layout>
       <div className="container max-w-md mx-auto py-12 px-4">
@@ -451,25 +462,7 @@ const PaymentSuccessPage = () => {
               )}
               
               <Button 
-                onClick={() => {
-                  // Get return URL from params or localStorage
-                  const params = new URLSearchParams(location.search);
-                  const returnUrl = params.get('returnUrl');
-                  
-                  let redirectUrl = '/';
-                  
-                  if (returnUrl) {
-                    redirectUrl = decodeURIComponent(returnUrl);
-                  } else {
-                    const storedReturnUrl = localStorage.getItem('payment_return_url');
-                    if (storedReturnUrl) {
-                      redirectUrl = storedReturnUrl;
-                      localStorage.removeItem('payment_return_url'); // Clean up
-                    }
-                  }
-                  
-                  navigate(redirectUrl);
-                }} 
+                onClick={handleReturnNow} 
                 className="w-full"
               >
                 Return Now
