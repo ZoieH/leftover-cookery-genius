@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Settings, ArrowLeft } from 'lucide-react';
 import Logo from '@/components/Logo';
 import UserNav from './UserNav';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -36,7 +37,8 @@ const Layout = ({
                   <Logo />
                 </Link>
               </div>
-              <div className="mt-1.5">
+              <div className="flex items-center gap-2">
+                <ThemeToggle />
                 <UserNav />
               </div>
             </div>
