@@ -17,6 +17,9 @@ import PaymentCanceledPage from '@/pages/PaymentCanceledPage';
 import { initializeUsageService } from '@/services/usageService';
 import { initializeRetryProcessor, attemptPaymentRecovery } from '@/services/stripeService';
 import { useAuthStore } from '@/services/firebaseService';
+import { Analytics } from '@vercel/analytics/react';
+import { ThemeProvider } from '@/components/theme-provider';
+import { RouterProvider } from 'react-router-dom';
 
 const queryClient = new QueryClient();
 
@@ -58,7 +61,7 @@ const App = () => {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
+      <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
         <Toaster />
         <Sonner />
         <Router>
@@ -75,7 +78,8 @@ const App = () => {
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Router>
-      </TooltipProvider>
+        <Analytics />
+      </ThemeProvider>
     </QueryClientProvider>
   );
 };

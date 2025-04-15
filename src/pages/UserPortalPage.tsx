@@ -309,16 +309,16 @@ export default function UserPortalPage() {
                   </div>
                 </div>
                 
-                {isPremium && subscriptionDetails && (
-                  <div className="space-y-4 rounded-lg border p-4">
-                    <h3 className="font-semibold">Subscription Details</h3>
-                    
+                <div className="space-y-4 rounded-lg border p-4 subscription-details">
+                  <h3 className="font-semibold details-title">Subscription Details</h3>
+                  
+                  {isPremium && subscriptionDetails ? (
                     <div className="space-y-2 text-sm">
-                      <div className="flex items-start gap-2">
+                      <div className="flex items-start gap-2 details-item">
                         <CalendarDays className="h-4 w-4 mt-0.5 text-muted-foreground" />
                         <div>
-                          <span className="font-medium">Next billing date: </span>
-                          {formatDate(subscriptionDetails.renewalDate)}
+                          <span className="font-medium details-label">Next billing date: </span>
+                          <span className="details-value">{formatDate(subscriptionDetails.renewalDate)}</span>
                           <br />
                           <span className="text-muted-foreground">
                             {subscriptionDetails.status === 'canceled' 
@@ -329,59 +329,92 @@ export default function UserPortalPage() {
                         </div>
                       </div>
                       
-                      <div className="flex items-start gap-2">
+                      <div className="flex items-start gap-2 details-item">
                         <Info className="h-4 w-4 mt-0.5 text-muted-foreground" />
                         <div>
-                          <span className="font-medium">Subscription started: </span>
-                          {formatDate(subscriptionDetails.premiumSince)}
+                          <span className="font-medium details-label">Subscription started: </span>
+                          <span className="details-value">{formatDate(subscriptionDetails.premiumSince)}</span>
                         </div>
                       </div>
-                    </div>
-                    
-                    <div className="pt-2 text-right">
-                      {subscriptionDetails.status === 'canceled' ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleReactivateSubscription}
-                          disabled={isProcessingAction}
-                        >
-                          Reactivate Subscription
-                        </Button>
-                      ) : (
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-muted-foreground hover:text-destructive"
-                            >
-                              Cancel Subscription
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Cancel Subscription?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Your subscription will remain active until {formatDate(subscriptionDetails.renewalDate)}, 
-                                after which it will expire. You will lose access to premium features after this date.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Keep Subscription</AlertDialogCancel>
-                              <AlertDialogAction 
-                                onClick={handleCancelSubscription}
-                                disabled={isProcessingAction}
+                      
+                      <div className="pt-2 text-right">
+                        {subscriptionDetails.status === 'canceled' ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleReactivateSubscription}
+                            disabled={isProcessingAction}
+                          >
+                            Reactivate Subscription
+                          </Button>
+                        ) : (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-muted-foreground hover:text-destructive"
                               >
-                                Yes, Cancel
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                                Cancel Subscription
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Cancel Subscription?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Your subscription will remain active until {formatDate(subscriptionDetails.renewalDate)}, 
+                                  after which it will expire. You will lose access to premium features after this date.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Keep Subscription</AlertDialogCancel>
+                                <AlertDialogAction 
+                                  onClick={handleCancelSubscription}
+                                  disabled={isProcessingAction}
+                                >
+                                  Yes, Cancel
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-start gap-2 details-item">
+                        <Info className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                        <div>
+                          {isPremium ? (
+                            <>
+                              <p className="text-muted-foreground">Loading subscription details...</p>
+                              {isLoadingDetails && (
+                                <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin mt-2"></div>
+                              )}
+                            </>
+                          ) : (
+                            <p className="text-muted-foreground">
+                              Upgrade to premium to see your subscription details and billing information.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {!isPremium && (
+                        <div className="pt-2 text-right">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => setPaywallOpen(true)}
+                            className="text-primary hover:text-primary-foreground hover:bg-primary"
+                          >
+                            Upgrade Now
+                          </Button>
+                        </div>
                       )}
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
                 
                 <div className="space-y-4">
                   <h3 className="font-semibold">Premium Features</h3>
