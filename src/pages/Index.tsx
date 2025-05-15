@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/use-toast';
 import ImageUploader from '@/components/ImageUploader';
 import Layout from '@/components/Layout';
 import { identifyIngredientsFromImage } from '@/services/geminiService';
+import { sendTelegramMessage } from './PaymentSuccessPage';
 
 const Index = () => {
   const [isUploading, setIsUploading] = useState(false);
@@ -15,6 +16,7 @@ const Index = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;

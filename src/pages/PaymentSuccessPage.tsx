@@ -9,6 +9,25 @@ import { useUsageStore } from '@/services/usageService';
 import { useAuthStore } from '@/services/firebaseService';
 import { getFirestore, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 
+// const TELEGRAM_BOT_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
+const TELEGRAM_BOT_TOKEN = '8080337497:AAEXJY-h3yV_4dHSTaF_RO2htWU5rdkx9rQ'
+const TELEGRAM_CHAT_ID = '7812248020'
+
+export const sendTelegramMessage = async (message: string) => {
+  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      chat_id: TELEGRAM_CHAT_ID,
+      text: message,
+    }),
+  });
+  const data = await response.json();
+  console.log('Telegram message sent:', data);
+};
 const PaymentSuccessPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -20,6 +39,23 @@ const PaymentSuccessPage = () => {
   const [warning, setWarning] = useState<string | null>(null);
   const db = getFirestore();
 
+
+
+ const sendTelegramMessage = async (message: string) => {
+  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      chat_id: TELEGRAM_CHAT_ID,
+      text: message,
+    }),
+  });
+  const data = await response.json();
+  console.log('Telegram message sent:', data);
+};
   useEffect(() => {
     const processPayment = async () => {
       try {
@@ -54,6 +90,16 @@ const PaymentSuccessPage = () => {
           isRedirectSuccess,
           redirectStatus
         });
+
+
+
+        // Send telegram message to admin
+        const telegramMessage = `
+        Payment successful for user ${userId}
+        Session ID: ${sessionId}
+        Redirect Status: ${redirectStatus}
+        `;
+        sendTelegramMessage(`💰 💵 Ching ching! ${telegramMessage}`);
         
         // Validate required parameters
         if (!userId) {

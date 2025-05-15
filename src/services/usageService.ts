@@ -138,10 +138,100 @@ export const useUsageStore = create<UsageStore>()(
 // Maximum number of searches for free users
 const MAX_FREE_SEARCHES = 3;
 
-// Check if premium status needs refresh (every 5 minutes)
+// Check if premium status needs refresh
 const needsPremiumRefresh = () => {
   const { lastPremiumCheck } = useUsageStore.getState();
-  return Date.now() - lastPremiumCheck > 5 * 60 * 1000; // 5 minutes
+  const REFRESH_INTERVAL = 60 * 1000; // 1 minute
+  return Date.now() - lastPremiumCheck > REFRESH_INTERVAL;
+};
+
+// Force immediate sync regardless of time interval
+export const forcePremiumSync = async () => {
+  const { syncPremiumStatus } = useUsageStore.getState();
+  return await syncPremiumStatus();
+};
+
+// Function to handle periodic sync
+const setupPeriodicSync = () => {
+  // Initial sync on page load
+  const initialSync = async () => {
+    const { user } = useAuthStore.getState();
+    if (user) {
+      console.log('Performing initial sync on page load');
+      await forcePremiumSync();
+    }
+  };
+
+  // Set up visibility change listener for page focus/blur
+  const handleVisibilityChange = async () => {
+    if (document.visibilityState === 'visible') {
+      const { user } = useAuthStore.getState();
+      if (user && needsPremiumRefresh()) {
+        console.log('Syncing premium status on page visibility change');
+        await forcePremiumSync();
+      }
+    }
+  };
+
+  // Set up periodic sync
+  const periodicSync = async () => {
+    const { user } = useAuthStore.getState();
+    if (user && needsPremiumRefresh()) {
+      console.log('Performing periodic sync');
+      await forcePremiumSync();
+    }
+  };
+
+  // Initial setup
+  initialSync();
+
+  // Set up event listeners
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  const syncInterval = setInterval(periodicSync, 60 * 1000); // Check every minute
+
+  // Return cleanup function
+  return () => {
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    clearInterval(syncInterval);
+  };
+};
+
+// Initialize the service
+export const initializeUsageService = () => {
+  // Start periodic sync
+  const cleanup = setupPeriodicSync();
+  
+  // Subscribe to auth changes
+  const unsubscribeAuth = useAuthStore.subscribe((state) => {
+    const { user } = state;
+    const { premiumUserId } = useUsageStore.getState();
+    
+    if (user) {
+      // User logged in, check if premium status is already set for this user
+      if (premiumUserId && premiumUserId !== user.uid) {
+        // Different user, reset premium status first
+        useUsageStore.setState({ 
+          isPremium: false,
+          premiumUserId: null
+        });
+      }
+      
+      // Then sync with server
+      forcePremiumSync();
+    } else if (premiumUserId) {
+      // User logged out, clear premium status that was tied to a user
+      useUsageStore.setState({ 
+        isPremium: false,
+        premiumUserId: null
+      });
+    }
+  });
+
+  // Return cleanup function
+  return () => {
+    cleanup();
+    unsubscribeAuth();
+  };
 };
 
 export const canPerformSearch = async () => {
@@ -196,55 +286,6 @@ export const canUsePremiumFeature = async () => {
   
   return isPremium;
 };
-
-// Initialize the component by syncing premium status on load
-export const initializeUsageService = async () => {
-  // Delay initialization slightly to ensure auth state is loaded first
-  setTimeout(async () => {
-    const { user } = useAuthStore.getState();
-    const { premiumUserId } = useUsageStore.getState();
-    
-    // Validate stored premium status against current user
-    if (premiumUserId && (!user || user.uid !== premiumUserId)) {
-      // User mismatch, reset premium status
-      useUsageStore.setState({ 
-        isPremium: false,
-        premiumUserId: null
-      });
-    } else if (user) {
-      // User is logged in, sync with server
-      await useUsageStore.getState().syncPremiumStatus();
-    }
-    
-    console.log('Usage service initialized');
-  }, 500);
-};
-
-// Auto-sync premium status when user auth state changes
-useAuthStore.subscribe((state) => {
-  const { user } = state;
-  const { premiumUserId } = useUsageStore.getState();
-  
-  if (user) {
-    // User logged in, check if premium status is already set for this user
-    if (premiumUserId && premiumUserId !== user.uid) {
-      // Different user, reset premium status first
-      useUsageStore.setState({ 
-        isPremium: false,
-        premiumUserId: null
-      });
-    }
-    
-    // Then sync with server
-    useUsageStore.getState().syncPremiumStatus();
-  } else if (premiumUserId) {
-    // User logged out, clear premium status that was tied to a user
-    useUsageStore.setState({ 
-      isPremium: false,
-      premiumUserId: null
-    });
-  }
-});
 
 // Initialize on load
 initializeUsageService(); 
