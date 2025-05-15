@@ -25,12 +25,18 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 export default async function handler(req, res) {
+  console.log('Webhook received');
+  console.log('raw request', req);
+  console.log(req.headers);
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const sig = req.headers['stripe-signature'];
+  console.log('sig', sig);
   const buf = await buffer(req);
+  console.log('buf', buf);
+  console.log('req.text', req.text());
   let event;
 
   try {
