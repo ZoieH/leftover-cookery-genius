@@ -3,6 +3,7 @@ import cors from 'cors';
 import Stripe from 'stripe';
 import dotenv from 'dotenv';
 import admin from 'firebase-admin';
+import { buffer } from 'micro';
 
 // Load environment variables
 dotenv.config();
@@ -60,6 +61,11 @@ app.get('/api/status', (req, res) => {
 // Webhook endpoint for Stripe events
 app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const sig = req.headers['stripe-signature'];
+  const buf = await buffer(req);
+
+  console.log('sig', sig);
+  console.log('req.body', req.body);
+  console.log('req.headers', req.headers);
   
   if (!sig) {
     return res.status(400).send('Webhook Error: No signature header');
@@ -67,7 +73,7 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, 
 
   try {
     const event = stripe.webhooks.constructEvent(
-      req.body,
+      buf,
       sig,
       process.env.STRIPE_WEBHOOK_SECRET
     );
@@ -89,7 +95,7 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, 
 
     res.json({ received: true });
   } catch (error) {
-    console.error('Webhook error:', error.message);
+    console.error('🤯🤯🤯 Webhook error:', error.message);
     return res.status(400).send(`Webhook Error: ${error.message}`);
   }
 });
