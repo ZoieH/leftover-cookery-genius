@@ -62,6 +62,12 @@ function fileToGenerativePart(fileDataUrl: string): { inlineData: { data: string
  */
 export async function identifyIngredientsFromImage(imageBase64DataUrl: string): Promise<IdentifiedIngredient[]> {
   try {
+    // Debug logging
+    console.log('🔍 Debug - Starting ingredient identification');
+    console.log('🔑 API Key present:', !!import.meta.env.VITE_GEMINI_API_KEY);
+    console.log('🔑 API Key length:', import.meta.env.VITE_GEMINI_API_KEY?.length);
+    console.log('📸 Image data length:', imageBase64DataUrl?.length);
+    
     if (!API_KEY) {
       throw new Error('Gemini API key not found. Please set VITE_GEMINI_API_KEY in your environment.');
     }
@@ -125,7 +131,12 @@ Focus on raw ingredients, not prepared dishes. Be realistic about quantities bas
       }));
     }
   } catch (error) {
-    console.error('Error identifying ingredients:', error);
+    console.error('❌ Error identifying ingredients:', error);
+    console.error('❌ Error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
     throw error;
   }
 } 
