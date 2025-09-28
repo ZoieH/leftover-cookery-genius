@@ -22,6 +22,7 @@ import { useUsageStore, canPerformSearch, getRemainingSearches, canUsePremiumFea
 import PaywallModal from '@/components/PaywallModal';
 import { useAuthStore } from '@/services/firebaseService';
 import AuthModal from '@/components/AuthModal';
+import SEOHead from '@/components/SEOHead';
 
 // Type for ingredient objects
 type Ingredient = {
@@ -319,77 +320,193 @@ const IngredientsPage = () => {
     }
   };
 
-  return (
-    <Layout>
-      <div className="container max-w-4xl mx-auto p-4 space-y-8 pb-24 md:pb-4">
-        <div className="flex items-center justify-between">
-          <Button
-            variant="ghost"
-            className="flex items-center gap-2"
-            onClick={handleBack}
-          >
-            <ArrowLeft className="h-4 w-4" />
-            {currentStep === 2 ? 'Back to Ingredients' : 'Back'}
-          </Button>
-        </div>
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "AI Recipe Generator - Select Ingredients",
+    "description": "Select your leftover ingredients and dietary preferences. Our AI will generate personalized recipes to reduce food waste.",
+    "url": "https://lefto.com/ingredients",
+    "isPartOf": {
+      "@type": "WebSite",
+      "name": "Lefto",
+      "url": "https://lefto.com"
+    }
+  };
 
-        <div className="space-y-8">
-          <div className="space-y-4">
-            <h2 className="text-2xl font-medium text-center">
-              {currentStep === 1 ? 'Your Ingredients' : 'Recipe Recommendations'}
-            </h2>
-            
-            <div className="flex justify-center">
-              <div className="flex items-center gap-3">
-                <div className={cn(
-                  "flex items-center justify-center w-8 h-8 rounded-full font-medium transition-colors",
-                  currentStep >= 1 ? "bg-primary text-primary-foreground" : "bg-muted"
-                )}>
-                  1
-                </div>
-                <div className={cn(
-                  "h-px w-16",
-                  currentStep >= 2 ? "bg-primary" : "bg-muted"
-                )} />
-                <div className={cn(
-                  "flex items-center justify-center w-8 h-8 rounded-full font-medium transition-colors",
-                  currentStep >= 2 ? "bg-primary text-primary-foreground" : "bg-muted"
-                )}>
-                  2
+  return (
+    <>
+      <SEOHead 
+        title="Select Ingredients - AI Recipe Generator"
+        description="Select your leftover ingredients and dietary preferences. Our AI will generate personalized recipes to reduce food waste."
+        keywords="ingredient selection, AI recipe generator, dietary preferences, leftover ingredients, food waste reduction"
+        canonical="https://lefto.com/ingredients"
+        structuredData={structuredData}
+      />
+      
+      <Layout>
+        <div className="container max-w-4xl mx-auto p-4 space-y-8 pb-24 md:pb-4">
+          <div className="flex items-center justify-between">
+            <Button
+              variant="ghost"
+              className="flex items-center gap-2"
+              onClick={handleBack}
+            >
+              <ArrowLeft className="h-4 w-4" />
+              {currentStep === 2 ? 'Back to Ingredients' : 'Back'}
+            </Button>
+          </div>
+
+          <div className="space-y-8">
+            <div className="space-y-4">
+              <h1 className="text-3xl font-bold text-center">
+                {currentStep === 1 ? 'Select Your Ingredients' : 'AI Recipe Recommendations'}
+              </h1>
+              
+              <div className="flex justify-center">
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "flex items-center justify-center w-8 h-8 rounded-full font-medium transition-colors",
+                    currentStep >= 1 ? "bg-primary text-primary-foreground" : "bg-muted"
+                  )}>
+                    1
+                  </div>
+                  <div className={cn(
+                    "h-px w-16",
+                    currentStep >= 2 ? "bg-primary" : "bg-muted"
+                  )} />
+                  <div className={cn(
+                    "flex items-center justify-center w-8 h-8 rounded-full font-medium transition-colors",
+                    currentStep >= 2 ? "bg-primary text-primary-foreground" : "bg-muted"
+                  )}>
+                    2
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Show remaining searches for free users */}
-          {!isPremiumUser && (
-            <div className="mb-4 p-4 bg-muted rounded-lg">
-              <p className="text-sm text-muted-foreground">
-                <span id="remaining-searches">
-                  {/* This will be populated by effect */}
-                  Loading search count...
-                </span>{' '}
-                <Button 
-                  variant="link" 
-                  className="p-0 h-auto font-normal text-primary"
-                  onClick={() => navigate('/upgrade')}
-                >
-                  Upgrade to premium
-                </Button>
-              </p>
-            </div>
-          )}
+            {/* Show remaining searches for free users */}
+            {!isPremiumUser && (
+              <div className="mb-4 p-4 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  <span id="remaining-searches">
+                    {/* This will be populated by effect */}
+                    Loading search count...
+                  </span>{' '}
+                  <Button 
+                    variant="link" 
+                    className="p-0 h-auto font-normal text-primary"
+                    onClick={() => navigate('/upgrade')}
+                  >
+                    Upgrade to premium
+                  </Button>
+                </p>
+              </div>
+            )}
 
-          {/* Step 1: Combined ingredients and preferences */}
-          {currentStep === 1 && (
-            <>
-              <h2 className="text-2xl font-semibold mb-4">Step 1: Select Ingredients & Preferences</h2>
-              <Card className="mb-8">
-                <CardContent className="pt-6">
-                  <div className="space-y-2">
-                    {ingredients.map(ingredient => (
-                      <div key={ingredient.id} className="ingredient-item">
-                        {editing === ingredient.id ? (
+            {/* Step 1: Combined ingredients and preferences */}
+            {currentStep === 1 && (
+              <>
+                <h2 className="text-2xl font-semibold mb-4">Step 1: Select Ingredients & Preferences</h2>
+                <Card className="mb-8">
+                  <CardContent className="pt-6">
+                    <div className="space-y-2">
+                      {ingredients.map(ingredient => (
+                        <div key={ingredient.id} className="ingredient-item">
+                          {editing === ingredient.id ? (
+                            <div className="flex flex-col gap-3 w-full">
+                              <div className="flex items-center gap-2">
+                                <Input 
+                                  value={tempIngredient.name}
+                                  onChange={(e) => setTempIngredient({
+                                    ...tempIngredient, 
+                                    name: e.target.value.slice(0, 50)
+                                  })}
+                                  className="flex-1 min-h-[4rem] text-base py-2 px-3 resize-none"
+                                  placeholder="Ingredient name"
+                                  style={{ height: 'auto', minHeight: '4rem' }}
+                                />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Input 
+                                  value={tempIngredient.quantity}
+                                  onChange={(e) => setTempIngredient({...tempIngredient, quantity: e.target.value})}
+                                  className="w-20"
+                                  type="number"
+                                  placeholder="Qty"
+                                />
+                                <Select 
+                                  value={tempIngredient.unit}
+                                  onValueChange={(value) => setTempIngredient({...tempIngredient, unit: value})}
+                                >
+                                  <SelectTrigger className="w-28">
+                                    <SelectValue placeholder="Unit" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="g">g</SelectItem>
+                                    <SelectItem value="kg">kg</SelectItem>
+                                    <SelectItem value="ml">ml</SelectItem>
+                                    <SelectItem value="l">l</SelectItem>
+                                    <SelectItem value="pieces">pieces</SelectItem>
+                                    <SelectItem value="cups">cups</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <div className="flex gap-2 ml-auto">
+                                  <Button size="sm" variant="outline" onClick={cancelEdit}>Cancel</Button>
+                                  <Button size="sm" onClick={saveEdit}>Save</Button>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="flex items-center gap-3">
+                                <Checkbox 
+                                  id={`ingredient-${ingredient.id}`}
+                                  checked={ingredient.selected}
+                                  onCheckedChange={() => handleCheckboxChange(ingredient.id)}
+                                />
+                                <label 
+                                  htmlFor={`ingredient-${ingredient.id}`}
+                                  className={`font-medium ${!ingredient.selected ? 'text-muted-foreground line-through' : ''}`}
+                                >
+                                  {ingredient.name}
+                                </label>
+                              </div>
+                              
+                              <div className="flex items-center gap-4">
+                                <span className="text-sm text-muted-foreground">
+                                  {ingredient.quantity} {ingredient.unit}
+                                </span>
+                                
+                                <div className="flex items-center">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    onClick={() => startEditing(ingredient.id)}
+                                    className="h-8 w-8"
+                                  >
+                                    <Edit size={16} />
+                                    <span className="sr-only">Edit</span>
+                                  </Button>
+                                  
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    onClick={() => handleDelete(ingredient.id)}
+                                    className="h-8 w-8 text-destructive hover:text-destructive"
+                                  >
+                                    <Trash2 size={16} />
+                                    <span className="sr-only">Delete</span>
+                                  </Button>
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ))}
+
+                      {/* Add New Ingredient Form */}
+                      {isAddingNewIngredient && (
+                        <div className="ingredient-item bg-muted/20 rounded-md p-3 mt-4">
                           <div className="flex flex-col gap-3 w-full">
                             <div className="flex items-center gap-2">
                               <Input 
@@ -398,18 +515,19 @@ const IngredientsPage = () => {
                                   ...tempIngredient, 
                                   name: e.target.value.slice(0, 50)
                                 })}
-                                className="flex-1 min-h-[4rem] text-base py-2 px-3 resize-none"
                                 placeholder="Ingredient name"
+                                className="flex-1 min-h-[4rem] text-base py-2 px-3 resize-none"
                                 style={{ height: 'auto', minHeight: '4rem' }}
+                                autoFocus
                               />
                             </div>
                             <div className="flex items-center gap-2">
                               <Input 
                                 value={tempIngredient.quantity}
                                 onChange={(e) => setTempIngredient({...tempIngredient, quantity: e.target.value})}
+                                placeholder="Qty"
                                 className="w-20"
                                 type="number"
-                                placeholder="Qty"
                               />
                               <Select 
                                 value={tempIngredient.unit}
@@ -429,304 +547,210 @@ const IngredientsPage = () => {
                               </Select>
                               <div className="flex gap-2 ml-auto">
                                 <Button size="sm" variant="outline" onClick={cancelEdit}>Cancel</Button>
-                                <Button size="sm" onClick={saveEdit}>Save</Button>
+                                <Button size="sm" onClick={saveNewIngredient}>Add</Button>
                               </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <>
-                            <div className="flex items-center gap-3">
-                              <Checkbox 
-                                id={`ingredient-${ingredient.id}`}
-                                checked={ingredient.selected}
-                                onCheckedChange={() => handleCheckboxChange(ingredient.id)}
-                              />
-                              <label 
-                                htmlFor={`ingredient-${ingredient.id}`}
-                                className={`font-medium ${!ingredient.selected ? 'text-muted-foreground line-through' : ''}`}
-                              >
-                                {ingredient.name}
-                              </label>
-                            </div>
-                            
-                            <div className="flex items-center gap-4">
-                              <span className="text-sm text-muted-foreground">
-                                {ingredient.quantity} {ingredient.unit}
-                              </span>
-                              
-                              <div className="flex items-center">
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  onClick={() => startEditing(ingredient.id)}
-                                  className="h-8 w-8"
-                                >
-                                  <Edit size={16} />
-                                  <span className="sr-only">Edit</span>
-                                </Button>
-                                
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  onClick={() => handleDelete(ingredient.id)}
-                                  className="h-8 w-8 text-destructive hover:text-destructive"
-                                >
-                                  <Trash2 size={16} />
-                                  <span className="sr-only">Delete</span>
-                                </Button>
-                              </div>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    ))}
-
-                    {/* Add New Ingredient Form */}
-                    {isAddingNewIngredient && (
-                      <div className="ingredient-item bg-muted/20 rounded-md p-3 mt-4">
-                        <div className="flex flex-col gap-3 w-full">
-                          <div className="flex items-center gap-2">
-                            <Input 
-                              value={tempIngredient.name}
-                              onChange={(e) => setTempIngredient({
-                                ...tempIngredient, 
-                                name: e.target.value.slice(0, 50)
-                              })}
-                              placeholder="Ingredient name"
-                              className="flex-1 min-h-[4rem] text-base py-2 px-3 resize-none"
-                              style={{ height: 'auto', minHeight: '4rem' }}
-                              autoFocus
-                            />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Input 
-                              value={tempIngredient.quantity}
-                              onChange={(e) => setTempIngredient({...tempIngredient, quantity: e.target.value})}
-                              placeholder="Qty"
-                              className="w-20"
-                              type="number"
-                            />
-                            <Select 
-                              value={tempIngredient.unit}
-                              onValueChange={(value) => setTempIngredient({...tempIngredient, unit: value})}
-                            >
-                              <SelectTrigger className="w-28">
-                                <SelectValue placeholder="Unit" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="g">g</SelectItem>
-                                <SelectItem value="kg">kg</SelectItem>
-                                <SelectItem value="ml">ml</SelectItem>
-                                <SelectItem value="l">l</SelectItem>
-                                <SelectItem value="pieces">pieces</SelectItem>
-                                <SelectItem value="cups">cups</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <div className="flex gap-2 ml-auto">
-                              <Button size="sm" variant="outline" onClick={cancelEdit}>Cancel</Button>
-                              <Button size="sm" onClick={saveNewIngredient}>Add</Button>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* Add Ingredient Button */}
-                    {!isAddingNewIngredient && !editing && (
-                      <Button 
-                        variant="outline" 
-                        className="w-full mt-4 flex items-center justify-center gap-2 border-dashed"
-                        onClick={startAddingIngredient}
-                      >
-                        <Plus size={16} />
-                        Add Ingredient
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-              
-              {/* Add dietary preferences to Step 1 */}
-              <div className="grid gap-6 md:grid-cols-2 mb-8">
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-lg font-medium">Dietary Requirements</h3>
-                      {dietaryPreference && !['none', 'vegetarian'].includes(dietaryPreference) && (
-                        <span className="text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">
-                          PRO
-                        </span>
+                      {/* Add Ingredient Button */}
+                      {!isAddingNewIngredient && !editing && (
+                        <Button 
+                          variant="outline" 
+                          className="w-full mt-4 flex items-center justify-center gap-2 border-dashed"
+                          onClick={startAddingIngredient}
+                        >
+                          <Plus size={16} />
+                          Add Ingredient
+                        </Button>
                       )}
                     </div>
-                    <Select 
-                      value={dietaryPreference} 
-                      onValueChange={handleDietaryChange}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select dietary preference" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No restrictions</SelectItem>
-                        <SelectItem value="vegetarian">Vegetarian</SelectItem>
-                        <SelectItem value="vegan">
-                          Vegan
-                          <span className="ml-2 text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">PRO</span>
-                        </SelectItem>
-                        <SelectItem value="gluten-free">
-                          Gluten-Free
-                          <span className="ml-2 text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">PRO</span>
-                        </SelectItem>
-                        <SelectItem value="lactose-free">
-                          Lactose-Free
-                          <span className="ml-2 text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">PRO</span>
-                        </SelectItem>
-                        <SelectItem value="high-protein">
-                          High-Protein
-                          <span className="ml-2 text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">PRO</span>
-                        </SelectItem>
-                        <SelectItem value="low-carb">
-                          Low-Carb
-                          <span className="ml-2 text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">PRO</span>
-                        </SelectItem>
-                        <SelectItem value="kosher">
-                          Kosher
-                          <span className="ml-2 text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">PRO</span>
-                        </SelectItem>
-                        <SelectItem value="halal">
-                          Halal
-                          <span className="ml-2 text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">PRO</span>
-                        </SelectItem>
-                        <SelectItem value="atlantic">
-                          Atlantic
-                          <span className="ml-2 text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">PRO</span>
-                        </SelectItem>
-                        <SelectItem value="keto">
-                          Keto
-                          <span className="ml-2 text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">PRO</span>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
                   </CardContent>
                 </Card>
                 
-                <Card>
-                  <CardContent 
-                    className="pt-6 cursor-pointer" 
-                    onClick={() => !isPremiumUser && showPaywall('Calorie control')}
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-lg font-medium">Calorie Control</h3>
-                      <span className="text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">
-                        PRO
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div 
-                        className="flex-1 relative cursor-pointer"
-                        onClick={() => !isPremiumUser && showPaywall('Calorie control')}
-                      >
-                        <Input 
-                          type="number" 
-                          placeholder="Max calories per serving"
-                          value={calorieLimit}
-                          onChange={(e) => handleCalorieChange(e.target.value)}
-                          disabled={!isPremiumUser}
-                          className={`w-full disabled:opacity-50 ${!isPremiumUser ? "pointer-events-none" : ""}`}
-                        />
-                        {!isPremiumUser && (
-                          <div className="absolute inset-0" />
+                {/* Add dietary preferences to Step 1 */}
+                <div className="grid gap-6 md:grid-cols-2 mb-8">
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-lg font-medium">Dietary Requirements</h3>
+                        {dietaryPreference && !['none', 'vegetarian'].includes(dietaryPreference) && (
+                          <span className="text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">
+                            PRO
+                          </span>
                         )}
                       </div>
-                      <span className="text-sm text-muted-foreground whitespace-nowrap">kcal</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+                      <Select 
+                        value={dietaryPreference} 
+                        onValueChange={handleDietaryChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select dietary preference" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No restrictions</SelectItem>
+                          <SelectItem value="vegetarian">Vegetarian</SelectItem>
+                          <SelectItem value="vegan">
+                            Vegan
+                            <span className="ml-2 text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">PRO</span>
+                          </SelectItem>
+                          <SelectItem value="gluten-free">
+                            Gluten-Free
+                            <span className="ml-2 text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">PRO</span>
+                          </SelectItem>
+                          <SelectItem value="lactose-free">
+                            Lactose-Free
+                            <span className="ml-2 text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">PRO</span>
+                          </SelectItem>
+                          <SelectItem value="high-protein">
+                            High-Protein
+                            <span className="ml-2 text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">PRO</span>
+                          </SelectItem>
+                          <SelectItem value="low-carb">
+                            Low-Carb
+                            <span className="ml-2 text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">PRO</span>
+                          </SelectItem>
+                          <SelectItem value="kosher">
+                            Kosher
+                            <span className="ml-2 text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">PRO</span>
+                          </SelectItem>
+                          <SelectItem value="halal">
+                            Halal
+                            <span className="ml-2 text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">PRO</span>
+                          </SelectItem>
+                          <SelectItem value="atlantic">
+                            Atlantic
+                            <span className="ml-2 text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">PRO</span>
+                          </SelectItem>
+                          <SelectItem value="keto">
+                            Keto
+                            <span className="ml-2 text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">PRO</span>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardContent 
+                      className="pt-6 cursor-pointer" 
+                      onClick={() => !isPremiumUser && showPaywall('Calorie control')}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-lg font-medium">Calorie Control</h3>
+                        <span className="text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">
+                          PRO
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div 
+                          className="flex-1 relative cursor-pointer"
+                          onClick={() => !isPremiumUser && showPaywall('Calorie control')}
+                        >
+                          <Input 
+                            type="number" 
+                            placeholder="Max calories per serving"
+                            value={calorieLimit}
+                            onChange={(e) => handleCalorieChange(e.target.value)}
+                            disabled={!isPremiumUser}
+                            className={`w-full disabled:opacity-50 ${!isPremiumUser ? "pointer-events-none" : ""}`}
+                          />
+                          {!isPremiumUser && (
+                            <div className="absolute inset-0" />
+                          )}
+                        </div>
+                        <span className="text-sm text-muted-foreground whitespace-nowrap">kcal</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
 
-              {/* Remove the old premium feature notice since we now show inline PRO badges */}
-              {!isPremiumUser && (dietaryPreference && !['none', 'vegetarian'].includes(dietaryPreference) || calorieLimit) && (
-                <div className="mt-4 p-4 bg-muted rounded-lg">
-                  <h3 className="font-semibold mb-2">Premium Features Selected</h3>
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Your search will proceed without the premium filters you've selected.
-                  </p>
+                {/* Remove the old premium feature notice since we now show inline PRO badges */}
+                {!isPremiumUser && (dietaryPreference && !['none', 'vegetarian'].includes(dietaryPreference) || calorieLimit) && (
+                  <div className="mt-4 p-4 bg-muted rounded-lg">
+                    <h3 className="font-semibold mb-2">Premium Features Selected</h3>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Your search will proceed without the premium filters you've selected.
+                    </p>
+                    <Button 
+                      variant="outline"
+                      onClick={() => navigate('/upgrade')}
+                    >
+                      Upgrade to Premium
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+            
+            {/* Step 2: Recipe recommendations (was Step 3 before) */}
+            {currentStep === 2 && (
+              <>
+                <h2 className="text-2xl font-semibold mb-4">Step 2: Recipe Recommendations</h2>
+                
+                <IngredientBasedRecommendations 
+                  ingredients={getSelectedIngredientNames()}
+                  dietaryFilter={isPremiumUser ? dietaryPreference : ''}
+                  calorieLimit={isPremiumUser ? parseInt(calorieLimit) : undefined}
+                  onSelectRecipe={handleSelectRecipe}
+                />
+                
+                <div className="mt-8 flex justify-start">
                   <Button 
                     variant="outline"
-                    onClick={() => navigate('/upgrade')}
+                    className="gap-2"
+                    onClick={() => setCurrentStep(1)}
                   >
-                    Upgrade to Premium
+                    <ArrowLeft size={16} />
+                    Back to Ingredients
                   </Button>
                 </div>
-              )}
-            </>
-          )}
-          
-          {/* Step 2: Recipe recommendations (was Step 3 before) */}
-          {currentStep === 2 && (
-            <>
-              <h2 className="text-2xl font-semibold mb-4">Step 2: Recipe Recommendations</h2>
-              
-              <IngredientBasedRecommendations 
-                ingredients={getSelectedIngredientNames()}
-                dietaryFilter={isPremiumUser ? dietaryPreference : ''}
-                calorieLimit={isPremiumUser ? parseInt(calorieLimit) : undefined}
-                onSelectRecipe={handleSelectRecipe}
-              />
-              
-              <div className="mt-8 flex justify-start">
+              </>
+            )}
+          </div>
+
+          {/* Sticky button container */}
+          {currentStep === 1 && (
+            <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t md:relative md:border-0 md:p-0 md:mt-8">
+              <div className="container max-w-4xl mx-auto md:flex md:justify-center">
                 <Button 
-                  variant="outline"
-                  className="gap-2"
-                  onClick={() => setCurrentStep(1)}
+                  onClick={handleFindRecipes}
+                  className="w-full gap-2 md:w-auto"
+                  disabled={isGeneratingRecipe}
                 >
-                  <ArrowLeft size={16} />
-                  Back to Ingredients
+                  {isGeneratingRecipe ? (
+                    <>
+                      <Loader2 size={16} className="mr-2 animate-spin" />
+                      Finding Recipes...
+                    </>
+                  ) : (
+                    <>
+                      Find Recipes
+                      <ArrowRight size={16} />
+                    </>
+                  )}
                 </Button>
               </div>
-            </>
+            </div>
           )}
         </div>
 
-        {/* Sticky button container */}
-        {currentStep === 1 && (
-          <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t md:relative md:border-0 md:p-0 md:mt-8">
-            <div className="container max-w-4xl mx-auto md:flex md:justify-center">
-              <Button 
-                onClick={handleFindRecipes}
-                className="w-full gap-2 md:w-auto"
-                disabled={isGeneratingRecipe}
-              >
-                {isGeneratingRecipe ? (
-                  <>
-                    <Loader2 size={16} className="mr-2 animate-spin" />
-                    Finding Recipes...
-                  </>
-                ) : (
-                  <>
-                    Find Recipes
-                    <ArrowRight size={16} />
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
+        {user ? (
+          <PaywallModal 
+            isOpen={paywallOpen}
+            onClose={() => setPaywallOpen(false)}
+            feature={paywallFeature}
+          />
+        ) : (
+          <AuthModal 
+            isOpen={authModalOpen}
+            onClose={() => setAuthModalOpen(false)}
+            feature={paywallFeature}
+          />
         )}
-      </div>
-
-      {user ? (
-        <PaywallModal 
-          isOpen={paywallOpen}
-          onClose={() => setPaywallOpen(false)}
-          feature={paywallFeature}
-        />
-      ) : (
-        <AuthModal 
-          isOpen={authModalOpen}
-          onClose={() => setAuthModalOpen(false)}
-          feature={paywallFeature}
-        />
-      )}
-    </Layout>
+      </Layout>
+    </>
   );
 };
 

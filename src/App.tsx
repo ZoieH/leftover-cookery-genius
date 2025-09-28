@@ -20,7 +20,7 @@ import { useAuthStore } from '@/services/firebaseService';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { ThemeProvider } from '@/components/theme-provider';
-import { RouterProvider } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
 
 const queryClient = new QueryClient();
 
@@ -29,13 +29,8 @@ const App = () => {
 
   // Initialize services
   useEffect(() => {
-    // Initialize usage service (premium status checks)
     initializeUsageService();
-    
-    // Initialize premium status retry processor
     const cleanupRetryProcessor = initializeRetryProcessor();
-    
-    // Cleanup function
     return () => {
       if (cleanupRetryProcessor) cleanupRetryProcessor();
     };
@@ -43,11 +38,7 @@ const App = () => {
 
   // Attempt payment recovery when user is authenticated
   useEffect(() => {
-    // Only try to recover payments when:
-    // 1. Auth loading is complete
-    // 2. User is authenticated
     if (!loading && user) {
-      // Attempt payment recovery
       attemptPaymentRecovery()
         .then(success => {
           if (success) {
@@ -61,28 +52,31 @@ const App = () => {
   }, [user, loading]);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-        <Toaster />
-        <Sonner />
-        <Router>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/ingredients" element={<IngredientsPage />} />
-            <Route path="/recipe" element={<RecipePage />} />
-            <Route path="/admin" element={<AdminPage />} />
-            <Route path="/upgrade" element={<UpgradePage />} />
-            <Route path="/auth/email-link" element={<EmailLinkAuthPage />} />
-            <Route path="/portal" element={<UserPortalPage />} />
-            <Route path="/payment-success" element={<PaymentSuccessPage />} />
-            <Route path="/payment-canceled" element={<PaymentCanceledPage />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </Router>
-        <Analytics />
-        <SpeedInsights />
-      </ThemeProvider>
-    </QueryClientProvider>
+    <HelmetProvider>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+          <Toaster />
+          <Sonner />
+          <Router>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/ai-recipe-generator" element={<Index />} />
+              <Route path="/ingredients" element={<IngredientsPage />} />
+              <Route path="/recipe" element={<RecipePage />} />
+              <Route path="/admin" element={<AdminPage />} />
+              <Route path="/upgrade" element={<UpgradePage />} />
+              <Route path="/auth/email-link" element={<EmailLinkAuthPage />} />
+              <Route path="/portal" element={<UserPortalPage />} />
+              <Route path="/payment-success" element={<PaymentSuccessPage />} />
+              <Route path="/payment-canceled" element={<PaymentCanceledPage />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Router>
+          <Analytics />
+          <SpeedInsights />
+        </ThemeProvider>
+      </QueryClientProvider>
+    </HelmetProvider>
   );
 };
 
