@@ -75,8 +75,8 @@ export async function identifyIngredientsFromImage(imageBase64DataUrl: string): 
     // Convert the data URL to a format acceptable by Gemini
     const imagePart = fileToGenerativePart(imageBase64DataUrl);
     
-    // Get the generative model (Updated from gemini-pro-vision to gemini-1.5-flash)
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    // Get the generative model (Updated from gemini-pro-vision to gemini-2.0-flash)
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
     
     // Prepare the prompt to identify ingredients with quantities
     const prompt = `Identify all food ingredients in this image with their approximate quantities. 
