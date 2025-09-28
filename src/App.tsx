@@ -18,6 +18,7 @@ import { initializeUsageService } from '@/services/usageService';
 import { initializeRetryProcessor, attemptPaymentRecovery } from '@/services/stripeService';
 import { useAuthStore } from '@/services/firebaseService';
 import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { ThemeProvider } from '@/components/theme-provider';
 import { RouterProvider } from 'react-router-dom';
 
@@ -79,6 +80,7 @@ const App = () => {
           </Routes>
         </Router>
         <Analytics />
+        <SpeedInsights />
       </ThemeProvider>
     </QueryClientProvider>
   );
