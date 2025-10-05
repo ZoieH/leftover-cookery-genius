@@ -25,9 +25,9 @@ function countMatchingIngredients(recipe: Recipe, userIngredients: string[]): nu
 
 /**
  * Recommends recipes based on available ingredients using a three-layer approach:
- * 1. First searches our own database
- * 2. If no matches, tries Spoonacular API
- * 3. If still no matches, generates a recipe using OpenAI
+ * 1. First tries Spoonacular API (high-quality recipes with images)
+ * 2. If insufficient results, tries ChatGPT (AI-generated recipes)
+ * 3. If still insufficient, falls back to local database (last resort)
  * 
  * Returns a maximum of 3 recipes total, combined from all sources.
  */
@@ -37,7 +37,7 @@ export const recommendRecipesFromIngredients = async (
   options: RecommendationOptions = {}
 ): Promise<Recipe[]> => {
   const {
-    maxResults = 3 // Changed default to 3
+    maxResults = 3
   } = options;
 
   // Track how many recipes we've collected so far
@@ -45,40 +45,13 @@ export const recommendRecipesFromIngredients = async (
   let remainingCount = maxResults;
 
   try {
-    // Layer 1: Search our own database
-    const localRecipes = await searchRecipes({
-      ingredients,
-      dietaryPreference: dietaryFilter,
-      maxResults: remainingCount // Only request what we still need
-    });
-
-    // Sort local recipes by coverage
-    const sortedLocalRecipes = localRecipes
-      .sort((a, b) => {
-        const coverageA = calculateIngredientCoverage(a, ingredients);
-        const coverageB = calculateIngredientCoverage(b, ingredients);
-        return coverageB - coverageA;
-      });
-
-    // Add local recipes to our collection
-    collectedRecipes = [...collectedRecipes, ...sortedLocalRecipes.slice(0, remainingCount)];
-    const localRecipesAdded = Math.min(sortedLocalRecipes.length, remainingCount);
-    remainingCount = maxResults - collectedRecipes.length;
-
-    console.log(`📊 [RECIPE-SERVICE] Local recipes added: ${localRecipesAdded}, remaining slots: ${remainingCount}`);
-    
-    // If we've reached our max, return early
-    if (remainingCount <= 0) {
-      return collectedRecipes;
-    }
-
-    // Layer 2: Try Spoonacular API
+    // Layer 1: Try Spoonacular API first (high-quality recipes with images)
     try {
       console.log('🔍 [RECIPE-SERVICE] Attempting to fetch recipes from Spoonacular...');
       const spoonacularRecipes = await searchSpoonacularRecipes(ingredients, dietaryFilter);
       console.log('📊 [RECIPE-SERVICE] Spoonacular recipes received:', spoonacularRecipes.length);
       
-      // Sort Spoonacular recipes by coverage without filtering
+      // Sort Spoonacular recipes by coverage
       const sortedSpoonacularRecipes = spoonacularRecipes
         .sort((a, b) => {
           const coverageA = calculateIngredientCoverage(a, ingredients);
@@ -86,7 +59,7 @@ export const recommendRecipesFromIngredients = async (
           return coverageB - coverageA;
         });
 
-      // Add Spoonacular recipes to our collection, but only up to remaining count
+      // Add Spoonacular recipes to our collection
       collectedRecipes = [...collectedRecipes, ...sortedSpoonacularRecipes.slice(0, remainingCount)];
       const spoonacularRecipesAdded = Math.min(sortedSpoonacularRecipes.length, remainingCount);
       remainingCount = maxResults - collectedRecipes.length;
@@ -97,30 +70,54 @@ export const recommendRecipesFromIngredients = async (
       if (remainingCount <= 0) {
         return collectedRecipes;
       }
-
-      // If we had no Spoonacular recipes, log it
-      if (sortedSpoonacularRecipes.length === 0) {
-        console.log('⚠️ [RECIPE-SERVICE] No Spoonacular recipes found, trying ChatGPT...');
-      }
     } catch (error) {
       console.warn('Spoonacular API error:', error);
-      console.log('Spoonacular API failed, falling back to ChatGPT...');
+      console.log('Spoonacular API failed, trying ChatGPT...');
     }
 
-    // Layer 3: Generate recipe using OpenAI (only if we still need more recipes)
+    // Layer 2: Try ChatGPT (AI-generated recipes)
     if (remainingCount > 0) {
       try {
-        console.log('Attempting to generate recipe with ChatGPT...');
+        console.log('🤖 [RECIPE-SERVICE] Attempting to generate recipe with ChatGPT...');
         const aiRecipe = await generateRecipeWithOpenAI(ingredients, dietaryFilter);
         if (aiRecipe) {
-          console.log('Successfully generated recipe with ChatGPT');
+          console.log('✅ [RECIPE-SERVICE] Successfully generated recipe with ChatGPT');
           collectedRecipes = [...collectedRecipes, aiRecipe];
-          // No need to update remainingCount since we're done after this
+          remainingCount = maxResults - collectedRecipes.length;
         } else {
-          console.error('ChatGPT failed to generate a recipe');
+          console.log('⚠️ [RECIPE-SERVICE] ChatGPT failed to generate a recipe');
         }
       } catch (error) {
-        console.error('Error generating recipe with ChatGPT:', error);
+        console.error('❌ [RECIPE-SERVICE] Error generating recipe with ChatGPT:', error);
+      }
+    }
+
+    // Layer 3: Fall back to local database (last resort)
+    if (remainingCount > 0) {
+      try {
+        console.log('📚 [RECIPE-SERVICE] Falling back to local database...');
+        const localRecipes = await searchRecipes({
+          ingredients,
+          dietaryPreference: dietaryFilter,
+          maxResults: remainingCount
+        });
+
+        // Sort local recipes by coverage
+        const sortedLocalRecipes = localRecipes
+          .sort((a, b) => {
+            const coverageA = calculateIngredientCoverage(a, ingredients);
+            const coverageB = calculateIngredientCoverage(b, ingredients);
+            return coverageB - coverageA;
+          });
+
+        // Add local recipes to our collection
+        collectedRecipes = [...collectedRecipes, ...sortedLocalRecipes.slice(0, remainingCount)];
+        const localRecipesAdded = Math.min(sortedLocalRecipes.length, remainingCount);
+        remainingCount = maxResults - collectedRecipes.length;
+
+        console.log(`�� [RECIPE-SERVICE] Local recipes added: ${localRecipesAdded}, remaining slots: ${remainingCount}`);
+      } catch (error) {
+        console.error('❌ [RECIPE-SERVICE] Error searching local recipes:', error);
       }
     }
 
@@ -129,7 +126,7 @@ export const recommendRecipesFromIngredients = async (
     return collectedRecipes;
 
   } catch (error) {
-    console.error('Error recommending recipes:', error);
+    console.error('❌ [RECIPE-SERVICE] Error recommending recipes:', error);
     return collectedRecipes.length > 0 ? collectedRecipes : []; // Return what we have, even if there was an error
   }
-}; 
+};
