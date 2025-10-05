@@ -8,11 +8,13 @@ interface LogoProps {
 const Logo: React.FC<LogoProps> = ({ className }) => {
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      <span className="text-2xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/80">
-        lefto
-      </span>
+      <img 
+        src="/logo-lefto.png" 
+        alt="Lefto - AI Recipe Generator" 
+        className="h-8 w-auto"
+      />
     </div>
   );
 };
 
-export default Logo; 
+export default Logo;
