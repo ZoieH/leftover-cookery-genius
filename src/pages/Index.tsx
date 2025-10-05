@@ -95,7 +95,7 @@ const Index = () => {
     "@type": "WebApplication",
     "name": "Lefto - AI Recipe Generator",
     "description": "Generate recipes with AI from your leftover ingredients. Smart recipe app that reduces food waste.",
-    "url": "https://lefto.com",
+    "url": "https://www.leftorecipes.com",
     "applicationCategory": "FoodApplication",
     "operatingSystem": "Web Browser",
     "offers": {
@@ -118,7 +118,7 @@ const Index = () => {
         title="AI Recipe Generator - Turn Leftovers into Delicious Meals"
         description="Generate recipes with AI from your leftover ingredients. Upload photos and get instant cooking suggestions. Reduce food waste with our smart recipe app."
         keywords="AI recipe generator, generate recipes with AI, recipe generator from photo, AI cooking assistant, smart recipe app, leftover recipe generator, reduce food waste app"
-        canonical="https://lefto.com"
+        canonical="https://www.leftorecipes.com"
         structuredData={structuredData}
       />
       
@@ -335,8 +335,8 @@ const Index = () => {
                   <h4 className="font-medium mb-3">Contact</h4>
                   <p className="text-sm text-muted-foreground">
                     Have questions? Email us at<br />
-                    <a href="mailto:hello@lefto.com" className="text-primary hover:underline">
-                      hello@lefto.com
+                    <a href="mailto:hello@leftorecipes.com" className="text-primary hover:underline">
+                      hello@leftorecipes.com
                     </a>
                   </p>
                 </div>
